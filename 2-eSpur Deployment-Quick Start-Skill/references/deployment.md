@@ -1,10 +1,14 @@
-# eSpur 完整部署步骤（从零开始）
+# eSpur 完整部署步骤（从零开始）【v1 遗留链】
+
+> 本文档描述 v1 部署链（eSpur 主程序 + MySQL 云端），现已不再上报。
+> 当前实际运行的是 eSpur_v2 客户端 + neowatt 平台，见 `v2-client.md`；
+> 实例目录布局约定（192.168.0.163_1-2-3-4 / update_config.py 分发）仍沿用本文。
 
 本机环境参照：Raspberry Pi 4B，Raspberry Pi OS Lite (Debian 13 trixie)，aarch64，Python 3.13，wlan0 在测试局域网（192.168.1.x），PDU 网线直连 eth0。
 
 ## 0. 获取代码
 
-优先用 skill 自带离线快照（本网络 GitHub 不可达）：
+skill 自带离线快照（2026-10-16）：
 
 ```bash
 mkdir -p ~/eSpur && cd ~/eSpur
@@ -14,7 +18,7 @@ unzip ~/.zcode/skills/espur-deploy/assets/eSpur-code-snapshot.zip
 
 快照内容：2026-10-16 上传版本的干净拷贝（无 .git/.idea/.DS_Store），eSpur-deployment 里的 config.ini 保留本机模板值（含云端 DB 账号），pdu_ip_ports-pid.json 已重置为全 "0"。
 
-有外网且配好公钥时也可从 GitHub 拉：`git@github.com:beerjtu/eSpur-deployment.git`（部署脚本）和 `git@github.com:guomingtang/eSpur.git`（主程序，拉下后需自行打顶层层级为 `eSpur/` 的 zip）。
+旧上游（beerjtu/eSpur-deployment、guomingtang/eSpur）已由 `Polar-Zhang/eSpur` 收编；v2 客户端从该仓库同步（本网络实测可达，codeload tarball 方式）。
 
 ## 1. 系统依赖
 

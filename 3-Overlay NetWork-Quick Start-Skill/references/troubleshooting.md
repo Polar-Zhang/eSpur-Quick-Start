@@ -4,7 +4,7 @@
 
 | 症状 | 原因与处理 |
 |---|---|
-| enroll 返回 `token expired` / `token already used` | token 15 分钟有效、一次性。让管理员重新 `mesh-admin.py issue` |
+| enroll 返回 `token expired` / `token already used` | token 一次性（24 小时有效）。让管理员重新 `mesh-admin.py issue` |
 | enroll 返回 `bad public key format` | 实机的 wg 版本过旧生成的密钥格式异常；升级 wireguard-tools 后重跑 |
 | enroll 返回 `subnet conflict` | 两台 lab 机器声明了同一子网。管理员需确认哪台是真身，revoke 旧的后重新 issue |
 | enroll 成功但脚本报 `/etc/wireguard/wg0.conf: Permission denied` | 旧版脚本 bug（现行脚本已修）：token 模式分支漏建 `/etc/wireguard` 目录，**且此时 token 已被消耗**（hub 侧已注册）。处理：管理员重新 issue，用修复版脚本重跑 |

@@ -30,7 +30,7 @@ description: 让学校机房实机一句话加入 eSpur overlay 组网（WireGua
 
 ## 一句话接入（token 模式，推荐）
 
-向组网管理员要一个一次性 token（15 分钟有效），然后在实机上：
+向组网管理员要一个一次性 token（24 小时有效），然后在实机上：
 
 ```bash
 bash scripts/join_mesh.sh --enroll mesh-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -85,7 +85,7 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 
 | 症状 | 原因与处理 |
 |---|---|
-| enroll 报 token expired/already used | token 15 分钟有效且一次性。让管理员重新 `issue` |
+| enroll 报 token expired/already used | token 一次性（24 小时有效）。让管理员重新 `issue` |
 | enroll 成功但报 `/etc/wireguard/wg0.conf: Permission denied` | 旧版脚本 bug（已修）：token 模式漏建 `/etc/wireguard` 目录，**且 token 已被消耗**。重新 issue 后用修复版脚本重跑 |
 | 无 handshake，但 `ping 47.237.111.211` 通 | 先按 troubleshooting.md §0.5 判别丢包位置：STUN 通 + hub 全端口 timeout = **hub 阿里云安全组没放行 UDP**（实测最常见根因；控制台加 51820/udp + 443/udp，放行后等看门狗重试，不通则重新 enroll）；STUN 也不通才是本地网络拦 UDP，看门狗会自动切 443 |
 | handshake 正常但 ping 不通 10.66.66.1 | 阿里云安全组未放行对应 UDP 端口，或客户端 PublicKey 与 hub 不匹配（重入模式换过钥），重新走一次 enroll |
