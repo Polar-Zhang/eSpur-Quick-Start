@@ -1,5 +1,16 @@
 # 组网排障手册
 
+## 0. enroll 模式专属问题
+
+| 症状 | 原因与处理 |
+|---|---|
+| enroll 返回 `token expired` / `token already used` | token 15 分钟有效、一次性。让管理员重新 `mesh-admin.py issue` |
+| enroll 返回 `bad public key format` | 实机的 wg 版本过旧生成的密钥格式异常；升级 wireguard-tools 后重跑 |
+| enroll 返回 `subnet conflict` | 两台 lab 机器声明了同一子网。管理员需确认哪台是真身，revoke 旧的后重新 issue |
+| 重装后想拿回原 IP | 管理员用**同名**再 issue 一个 token，--enroll 即复用原 mesh IP 并轮换密钥 |
+| 看门狗行为检查 | `systemctl status espur-mesh-watchdog.timer`；`journalctl -t espur-mesh-watchdog --since -1h` 看自愈/切换记录 |
+| 看门狗反复在双端口间跳 | 两个 UDP 端口都时通时断 = 校园网出站不稳。看 journal 里哪个端口成功率高，把 wg0.conf 固定到该端口，或按第 1c 条上 wstunnel |
+
 按现象对照。先跑一次体检命令拿到事实，再查表：
 
 ```bash
