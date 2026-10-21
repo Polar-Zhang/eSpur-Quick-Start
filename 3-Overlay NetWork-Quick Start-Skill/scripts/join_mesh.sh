@@ -20,6 +20,8 @@ warn()  { printf '  \033[33m!!\033[0m: %s\n' "$*"; }
 die()   { printf '  \033[31mFAIL\033[0m: %s\n' "$*" >&2; exit 1; }
 step()  { bold "== $* =="; }
 
+# root 下 SUDO 置空（直接执行），非 root 用 sudo；set -u 下必须先初始化
+SUDO=""
 [ "$(id -u)" -eq 0 ] || SUDO="sudo"
 
 echo "=============================================="
