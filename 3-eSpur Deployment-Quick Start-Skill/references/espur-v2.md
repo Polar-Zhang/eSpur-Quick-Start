@@ -40,7 +40,6 @@ sudo systemctl restart espur-algorithm
 2. `src/hal/snmp_pdu.py` 覆盖后重打实例级 total_power 语义：`total_power = sum(port_powers)`（文件内有注释标记；上游 0d932c0 的其余修复——OID/缩放/set 字符串化——与本地一致）。
 3. 同步后跑一次直读验证：`cd eSpur_v2/src && python3 -c "import sys; sys.path.insert(0,'.'); from hal.snmp_pdu import SNMPPDU; print(SNMPPDU().get_power_data().total_power)"`（有负载应 >0）。
 4. `src/psu.py` 覆盖后重打 `SWITCH_DISABLED` 闸门（set_psu 开头，模式切换语义；上游无此代码）。
-5. ~~`src/hal/psu_snmp.py` 三个接口方法薄实现~~ **已修入上游**（2026-10-22）：同步后自动包含，本地补丁可移除。历史背景：上游抽象接口要求三方法但 SNMPPSUManager 未实现，实例化即 TypeError 进 crash loop。
 
 ## 平台接入（bootstrap，仅首次/凭证轮换时）
 
@@ -93,6 +92,7 @@ token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写�
 | SNMP 读数不全 0（OID 修复） | `0d932c0` | `grep -c "2.3.{port}.0" src/hal/snmp_pdu.py` ≥1 |
 | set_psu 字符串 ON/OFF | 同上 | `grep -c 's {state_str}' src/hal/snmp_pdu.py` ≥1 |
 | 单口功率上报 | `3b42ece` | `grep -c "port_powers" src/run_algorithm.py` ≥3 |
+| psu 接口三方法（get_psu_info 等） | `9a27e65` | `grep -c "def get_metrics" src/hal/psu_snmp.py` ≥1 |
 | 节能率未优化时报 0 | `dd1dcff` | `grep -c "decision_count > 0" src/run_algorithm.py` ≥1 |
 | 实时观测缓冲封顶（树莓派内存） | `9bd948c` | `grep -c "realtime_power_cache_max" src/data/duckdb_client.py` ≥1 |
 | 上报证书回落 | `248a76d` | config.ini 的 `duckdb_ssl_path` 留空即可 |
