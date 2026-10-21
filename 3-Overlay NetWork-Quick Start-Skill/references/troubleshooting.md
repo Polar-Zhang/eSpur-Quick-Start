@@ -7,6 +7,7 @@
 | enroll 返回 `token expired` / `token already used` | token 15 分钟有效、一次性。让管理员重新 `mesh-admin.py issue` |
 | enroll 返回 `bad public key format` | 实机的 wg 版本过旧生成的密钥格式异常；升级 wireguard-tools 后重跑 |
 | enroll 返回 `subnet conflict` | 两台 lab 机器声明了同一子网。管理员需确认哪台是真身，revoke 旧的后重新 issue |
+| enroll 成功但脚本报 `/etc/wireguard/wg0.conf: Permission denied` | 旧版脚本 bug：只有配置文件模式分支会 `install -d /etc/wireguard`，token 模式分支漏了，**且此时 token 已被消耗**（hub 侧已注册）。处理：管理员重新 issue，用修复版脚本重跑（脚本 enroll 分支应含 `install -d -m 700 /etc/wireguard`，2026-10-21 已修） |
 | 重装后想拿回原 IP | 管理员用**同名**再 issue 一个 token，--enroll 即复用原 mesh IP 并轮换密钥 |
 | 看门狗行为检查 | `systemctl status espur-mesh-watchdog.timer`；`journalctl -t espur-mesh-watchdog --since -1h` 看自愈/切换记录 |
 | 看门狗反复在双端口间跳 | 两个 UDP 端口都时通时断 = 校园网出站不稳。看 journal 里哪个端口成功率高，把 wg0.conf 固定到该端口，或按第 1c 条上 wstunnel |
@@ -20,6 +21,44 @@ ping -c 3 10.66.66.1             # 隧道层可达性（hub）
 ip route get 192.168.0.163       # 实验室网段路由
 journalctl -u wg-quick@wg0 -n 30 # 服务日志
 ```
+
+### 0.5 快速判别：丢包发生在校园网还是 hub 安全组？（2026-10-21 实测案例）
+
+`wg show` 只有 sent 没有 received、双端口都握不上手时，用两步定位丢包位置：
+
+```bash
+# ① 校园网是否放行"任意目的地"出站 UDP：STUN 请求公共服务器 3478/udp
+python3 - <<'EOF'
+import socket, os, struct
+msg = struct.pack('>HHI', 0x0001, 0, 0x2112A442) + os.urandom(12)
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(4)
+s.sendto(msg, ("stun.miwifi.com", 3478))   # 备选: stun.qq.com / ntp.aliyun.com:123
+print("REPLY ok => 校园网放行出站 UDP" if s.recvfrom(256)[0] else "no reply")
+EOF
+
+# ② hub 侧 UDP 是否被云防火墙丢弃：对 hub 任意 UDP 端口发包
+python3 - <<'EOF'
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(4)
+s.sendto(b"probe", ("47.237.111.211", 9999))   # 未开服务的端口
+try:
+    s.recv(64); print("got reply")
+except ConnectionRefusedError:
+    print("ICMP port-unreachable => UDP 路径通，hub 安全组已放行（端口逻辑问题另查）")
+except socket.timeout:
+    print("timeout => 包在 hub 云防火墙被静默丢弃：阿里云安全组没放行 UDP")
+EOF
+```
+
+判读（2026-10-21 实测：STUN 通 + hub 全端口 timeout → 阿里云安全组漏放行；放行 51820/udp + 443/udp 后看门狗自动建联，无需重新 enroll）：
+
+| ① STUN/NTP | ② hub 探测 | 结论 | 处理 |
+|---|---|---|---|
+| 通 | ICMP unreachable | UDP 全链路通，是配置/密钥问题 | 按第 2 条查 PublicKey 与 hub peer |
+| 通 | timeout | **hub 阿里云安全组没放行 UDP**（最常见） | 控制台加入方向 `51820/udp` + `443/udp`，源 0.0.0.0/0；放行后看门狗自动建联，无需新 token |
+| 不通 | — | 校园网拦出站 UDP | 按第 1b 条走 443，仍不行按 1c 上 wstunnel |
+
+注：NTP（`ntp.aliyun.com:123`）可替代 STUN 做测试①，但只能证明"特定端口对特定目的地"放行；STUN 证明的是任意目的地，两者结合判读更稳。
 
 ## 1. 无 handshake，但 ping 47.237.111.211 通
 
@@ -76,6 +115,10 @@ sudo iptables -t nat -C POSTROUTING -s 10.66.66.0/24 -o eth0 -j MASQUERADE 2>/de
 ```
 
 还不到 → 在实机上 ping 192.168.0.163 确认实机自己能通 PDU（实机本体不通就是 PDU/网线/ACL 问题，与组网无关，去查 deployment skill）。
+
+### 3.5 Debian/Ubuntu 实机注意：iptables 缺失时 NAT 静默失效
+
+Debian 13 只预装 nftables（树莓派 Raspberry Pi OS Lite 同样）。join_mesh.sh 第 5 步在无 firewalld 时走 iptables，而 `iptables` 命令不存在时脚本**不报错、继续往下跑**，masquerade 根本没配上——症状是隧道通了之后，广州终端 ping 10.66.66.101 通、ping 192.168.0.163 不通。预防：跑脚本前 `command -v iptables || sudo apt-get install -y iptables`。
 
 ## 4. 起隧道后实机整个失联
 

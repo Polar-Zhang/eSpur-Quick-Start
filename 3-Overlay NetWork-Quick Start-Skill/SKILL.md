@@ -86,9 +86,10 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 | 症状 | 原因与处理 |
 |---|---|
 | enroll 报 token expired/already used | token 15 分钟有效且一次性。让管理员重新 `issue` |
-| 无 handshake，但 `ping 47.237.111.211` 通 | 校园网拦 UDP 51820。看门狗会自动切 443；若 443 也不通，查阿里云安全组是否放行了 443/udp，见 references/troubleshooting.md |
+| enroll 成功但报 `/etc/wireguard/wg0.conf: Permission denied` | 旧版脚本 bug：token 模式分支漏建 `/etc/wireguard` 目录，**且 token 已被消耗**。重新 issue + 用修复版（2026-10-21）重跑 |
+| 无 handshake，但 `ping 47.237.111.211` 通 | 先按 troubleshooting.md §0.5 判别丢包位置：STUN 通 + hub 全端口 timeout = **阿里云安全组没放行 UDP**（控制台加 51820/udp + 443/udp，放行后看门狗自动建联，无需新 token）；STUN 也不通才是校园网拦 UDP，看门狗会自动切 443 |
 | handshake 正常但 ping 不通 10.66.66.1 | 阿里云安全组未放行对应 UDP 端口，或客户端 PublicKey 与 hub 不匹配（重入模式换过钥），重新走一次 enroll |
-| 终端能 ping 实机，ping 不到 192.168.0.163 | 实机网关配置缺失。重跑 `join_mesh.sh`（幂等），或按 references/troubleshooting.md 第 3 条手动配 |
+| 终端能 ping 实机，ping 不到 192.168.0.163 | 实机网关配置缺失。重跑 `join_mesh.sh`（幂等），或按 references/troubleshooting.md 第 3 条手动配。Debian 13/RPi OS 需先确认 iptables 已装（见 §3.5，缺失时 NAT 静默失效） |
 | 实机起隧道后整个失联 | AllowedIPs 写入了 192.168.0.0/24。token 模式不会发生（脚本强制）；文件模式脚本会拒绝。已发生时按 troubleshooting.md 第 4 条恢复 |
 | 大包丢、SSH 卡 | 跨境 MTU，配置已设 1380；仍卡降到 1360 |
 | 重装系统后重连 | 直接 `--enroll` 新 token（管理员同名 issue 即可），mesh IP 不变、密钥自动轮换 |
@@ -101,3 +102,11 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 - hub 已上线并三重开机自启：`wg-quick@hub`（51820）、`wg-quick@hub443`（443）、`espur-mesh-enroll`（注册 API，经 nginx `https://neowatt.cn/espur/api/mesh/` 暴露）。
 - `192.168.0.0/24` 已注册给 lab-01；新 lab 机器带**新**子网时在 issue 时声明，服务会做冲突检查。
 - lab-01 可走文件模式（配置在 hub 的 `/home/zp/espur-mesh/peers/lab-01/wg0.conf`）或 token 模式（issue 一个 `lab-01` 的 token 即可重入）。
+
+## 2026-10-21 lab-01（eSpur-5090 树莓派）实际接入记录
+
+- 接入机：Raspberry Pi 4B / Raspberry Pi OS Lite trixie，wlan0 上外网、eth0 接实验室网段（192.168.0.200/24）。已 enroll 为 10.66.66.101，wg-quick + 看门狗 enabled。
+- 踩坑 1（脚本 bug，已修）：token 模式分支漏建 `/etc/wireguard` 目录 → 注册成功但写配置失败，token 被白白消耗一个。修复 = enroll 分支开头 `install -d -m 700 /etc/wireguard` 并用 `sudo tee` 写配置。
+- 踩坑 2（脚本加固，已修）：Debian 13/RPi OS 只预装 nftables，无 iptables 时第 5 步 NAT 静默失败（脚本不报错）。加固 = 缺失时自动 `apt/dnf install`，失败则 die。
+- 踩坑 3（hub 侧）：无 handshake 且只发不收时，不要急着怀疑校园网——用 troubleshooting.md §0.5 的两步法判别：STUN（stun.miwifi.com:3478）能回包 = 校园网放行任意出站 UDP；对 hub 未开服务端口（如 9999/udp）发包 timeout（而非 ICMP port-unreachable）= 阿里云安全组在静默丢包。本例即安全组漏放行，控制台补 51820/udp + 443/udp 后隧道自动建立。
+- sudo 提示：LCD skill 写的"免密 sudo 已配置"在该机重装后失效过一次；接入脚本需 root，先 `sudo -n true` 验证，不行就补 `/etc/sudoers.d/` NOPASSWD 或让用户 `sudo -v`。

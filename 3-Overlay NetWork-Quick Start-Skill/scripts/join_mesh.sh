@@ -20,8 +20,6 @@ warn()  { printf '  \033[33m!!\033[0m: %s\n' "$*"; }
 die()   { printf '  \033[31mFAIL\033[0m: %s\n' "$*" >&2; exit 1; }
 step()  { bold "== $* =="; }
 
-# root 下 SUDO 置空（直接执行），非 root 用 sudo；set -u 下必须先初始化
-SUDO=""
 [ "$(id -u)" -eq 0 ] || SUDO="sudo"
 
 echo "=============================================="
@@ -85,7 +83,8 @@ if [ "$MODE" = "--enroll" ]; then
     MESH_IP=$(echo "$RESP" | python3 -c 'import sys,json; print(json.load(sys.stdin)["mesh_ip"])')
     HUB_PUB=$(echo "$RESP" | python3 -c 'import sys,json; print(json.load(sys.stdin)["hub_public_key"])')
     [ "$MESH_IP" = "$MY_MESH_IP" ] || warn "分配到的 mesh IP 是 $MESH_IP（脚本常量按 lab 首机写死为 $MY_MESH_IP，后续步骤不受影响）"
-    umask 077; cat > "$WG_CONF" <<EOF
+    $SUDO install -d -m 700 /etc/wireguard
+    umask 077; $SUDO tee "$WG_CONF" >/dev/null <<EOF
 [Interface]
 Address = $MESH_IP/24
 PrivateKey = $PRIV
@@ -161,6 +160,16 @@ if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active firewalld >/de
     $SUDO firewall-cmd --reload >/dev/null
     ok "firewalld: masquerade + wg0 已加入 zone"
 else
+    # Debian 13/RPi OS 只预装 nftables：iptables 缺失时静默跳过会让 NAT 缺失（终端到不了 PDU），必须补装
+    if ! command -v iptables >/dev/null 2>&1; then
+        if command -v apt >/dev/null 2>&1; then
+            $SUDO apt-get install -y iptables >/dev/null 2>&1 || die "iptables 缺失且 apt 安装失败：NAT 无法配置，手动 apt install iptables 后重跑"
+        elif command -v dnf >/dev/null 2>&1; then
+            $SUDO dnf install -y iptables-nft >/dev/null 2>&1 || die "iptables 缺失且 dnf 安装失败：NAT 无法配置，手动 dnf install iptables-nft 后重跑"
+        else
+            die "iptables 缺失且无法自动安装：终端将无法穿过本机访问 192.168.0.x。手动装 iptables 后重跑"
+        fi
+    fi
     if ! $SUDO iptables -t nat -C POSTROUTING -s 10.66.66.0/24 -o "$LAB_IF" -j MASQUERADE 2>/dev/null; then
         $SUDO iptables -t nat -A POSTROUTING -s 10.66.66.0/24 -o "$LAB_IF" -j MASQUERADE
         if command -v netfilter-persistent >/dev/null 2>&1; then
