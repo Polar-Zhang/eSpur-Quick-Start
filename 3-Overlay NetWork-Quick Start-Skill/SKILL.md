@@ -97,7 +97,7 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 
 完整排查手册见 `references/troubleshooting.md`。
 
-## 本机既成事实（2026-10-21 lab-01 入网 ✅）
+## 本机既成事实（2026-10-21 lab-01 入网 ✅，平台接入 ✅）
 
 - hub（新加坡 47.237.111.211 = 10.66.66.1）三重开机自启：`wg-quick@hub`（51820/udp）、`wg-quick@hub443`（443/udp，同一密钥同一 peer 表）、`espur-mesh-enroll`（注册 API，经 nginx `https://neowatt.cn/espur/api/mesh/` 暴露）。阿里云安全组入方向已放行 51820/udp + 443/udp。
 - lab-01 = 本机（eSpur-5090，Raspberry Pi 4B / Raspberry Pi OS Lite trixie，wlan0 上外网、eth0 = 192.168.0.200/24）：已 enroll 为 10.66.66.101，wg-quick + 看门狗 enabled，网关职责（ip_forward + eth0 masquerade）在位，`ping -I 10.66.66.101 192.168.0.163` 验证过终端→实机→PDU 全路径。重入 = 管理员同名 `issue` + 本机重新 `--enroll`（mesh IP 不变、密钥轮换）。

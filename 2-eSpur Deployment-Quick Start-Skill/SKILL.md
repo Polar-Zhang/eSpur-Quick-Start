@@ -47,6 +47,17 @@ unzip ~/.zcode/skills/espur-deploy/assets/eSpur-code-snapshot.zip
 4. 打 `eSpur.zip`（**顶层必须是 `eSpur/` 目录**，排除 .git/.idea/.DS_Store）→ `python3 deploy_eSpur_via_unzip.py` → `python3 update_config.py`。
 5. `python3 run_eSpur.py 0` 启动全部；`python3 stat_eSpur.py` 验证。
 
+## v2 客户端（当前实际在跑的形态）
+
+v1 部署链之后，本机现运行 **eSpur_v2 real 模式**（直连 PDU + 上报 neowatt 云平台
+`https://neowatt.cn/espur`，不再使用 MySQL 云端）。目录布局、启动命令、config.ini
+云平台字段、**最低代码版本表**（SNMP OID 修复 0d932c0 / 单口上报 3b42ece）和已知坑
+见 `references/v2-client.md`——排障前先读它，再看 troubleshooting.md。
+
+平台接入（登记设备 / bootstrap token / 数据验收）属于组网 skill：
+`3-Overlay NetWork-Quick Start-Skill/references/platform-onboard.md`。
+完整链路顺序：本 skill（部署 v2 客户端）→ skill 3（组网 + 平台接入）。
+
 ## 日常运维
 
 ```bash

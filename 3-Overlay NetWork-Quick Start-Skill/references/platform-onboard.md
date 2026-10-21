@@ -27,7 +27,7 @@ python3 eSpur_v2/scripts/bootstrap_config.py --token dboot-xxxx
 
 1. **登记设备**：实例页 → 「登记实机」→ 填设备名（lab-01）、版本、位置、IP（填 mesh IP `10.66.66.101`）。
 2. **创建实例**：设备详情 → 创建实例，命名约定 `192.168.0.163_1-2-3-4`（PDU_IP_端口段），记下 `external_id`（即 instance_id）。
-3. **签发 bootstrap token**（一次性、15 分钟）：
+3. **签发 bootstrap token**（一次性、24 小时有效）：
 
    ```bash
    curl -s -X POST https://neowatt.cn/espur/api/device-bootstrap/tokens \
@@ -36,6 +36,17 @@ python3 eSpur_v2/scripts/bootstrap_config.py --token dboot-xxxx
    ```
 
    返回 `dboot-...`。email 对应的上报账号**自动创建**（member 角色，随机密码，只用 api_key）；已存在则复用并轮换 api_key（旧 key 立即失效）。
+
+## 单口功率与曲线（2026-10-21 起）
+
+客户端每次采样附带 PDU 单口功率，平台按口出曲线（设备卡片 2×2 小图 + 详情页分图）。
+
+- **客户端最低版本**：`3b42ece`（实时循环带单口上报）+ `0d932c0`（SNMP OID 修复，
+  之前读数恒 0）。自检：`grep -c port_powers src/run_algorithm.py` ≥3、
+  `grep -c "2.3.{port}.0" src/hal/snmp_pdu.py` ≥1。
+- 该 PDU（ATEN switched-pdu）没有单口瞬时功率 OID，单口功率 = 口电流 × 电压；
+  总功率用设备级计量。口径：API 返回的 power 单位是 W（后端已还原）。
+- 验收：平台设备卡片出现 4 条曲线即数据在进；四口之和 ≈ 总功率。
 
 ## 实机侧操作（树莓派）
 
