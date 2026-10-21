@@ -63,7 +63,7 @@ sudo systemctl restart espur-algorithm         # 重启上报（改代码/配置
 tail -f ~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/algorithm_stdout.log  # 实时日志(-u 无缓冲)
 bash ~/.zcode/skills/espur-deploy/scripts/check_pdu.sh   # PDU 连通性体检（只读）
 
-**模式切换（本机已装 `/usr/local/bin/espur-switch.sh`，skill 副本在 `scripts/`）—— 只有 live 子命令会开启端口切换能力：**
+**模式切换（本机已装 `/usr/local/bin/espur-switch.sh`，skill 副本在 `scripts/`）—— 闸门方案：算法服务常驻（遥测/决策/上报不断），`SWITCH_DISABLED` 标记文件控制切换能力，只有 live 子命令会移除标记开启切换：**
 
 ```bash
 # 远程一条命令切换（首次要 sudo 密码；局域网内把 IP 换成 192.168.1.17）

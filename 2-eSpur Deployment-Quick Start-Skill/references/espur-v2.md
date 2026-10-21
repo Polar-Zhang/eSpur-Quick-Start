@@ -19,7 +19,7 @@ sudo systemctl restart espur-algorithm
 
 参数铁律：`--publish-db`（漏了=不上报）、`--duration 0`（0=无限）、`python3 -u`（无缓冲日志）。
 
-**模式切换：日常启停用 `sudo /usr/local/bin/espur-switch.sh test|live`（本机已装，skill 副本 scripts/）。只有 `live` 开启端口切换能力（coarse 会关冗余口）；PDU 接测试负载（屏幕/充电器）时必须保持 test。**
+**模式切换（闸门方案）：算法服务常驻运行，`SWITCH_DISABLED` 标记文件（部署目录下）存在即禁止一切 PSU 切换（set_psu 只打日志不下发），遥测/上报照常。日常用 `sudo /usr/local/bin/espur-switch.sh test|live` 增删标记（即时生效，无需重启）；只有 `live` 开启端口切换能力；PDU 接测试负载（屏幕/充电器）时必须保持 test。闸门代码在 src/psu.py 的 set_psu 开头（上游同步该文件后需重打）。**
 
 ## 代码同步（codeload tarball 通道）
 

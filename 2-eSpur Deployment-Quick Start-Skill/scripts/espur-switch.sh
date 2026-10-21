@@ -1,32 +1,27 @@
 #!/bin/bash
-# eSpur 算法模式切换：test=测试模式(停算法+全部端口ON) / live=正式模式(算法接管节能优化)
+# eSpur 模式切换（闸门方案：算法服务常驻，遥测/决策/上报不断，仅切换能力开关）
+#   test = 放置 SWITCH_DISABLED 标记，PSU 切换被禁止（测试模式）
+#   live = 移除标记，算法恢复真实切换（正式模式）
 # 用法: sudo /usr/local/bin/espur-switch.sh test|live
 set -u
 MODE="${1:-}"
 SVC=espur-algorithm
-PDU=192.168.0.163
+GATE=/home/espur-5090/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/SWITCH_DISABLED
 
+systemctl enable "$SVC" >/dev/null 2>&1
+systemctl start "$SVC"
 case "$MODE" in
   test)
-    systemctl stop "$SVC" 2>/dev/null
-    systemctl disable "$SVC" >/dev/null 2>&1
-    echo "-- 已停止算法并禁用自启，正在逐口恢复 ON(约8秒)..."
-    for n in 1 2 3 4 5 6 7 8; do
-      snmpset -v1 -c private -t 5 -r 1 "$PDU" ".1.3.6.1.4.1.23273.2.4.$n.0" s ON >/dev/null 2>&1
-      sleep 1
-    done
-    echo "== 测试模式已生效，8 口继电器状态:"
-    snmpwalk -v1 -c public -t 5 -r 1 "$PDU" .1.3.6.1.4.1.23273.2.4 2>/dev/null | sed 's/.*23273.2.4.//;s/ = STRING: /  /'
+    touch "$GATE"
+    echo "== 测试模式：切换已禁止（标记: $GATE），遥测/上报继续，服务 $(systemctl is-active $SVC)"
     ;;
   live)
-    systemctl enable "$SVC" >/dev/null 2>&1
-    systemctl restart "$SVC"
-    sleep 3
-    echo "== 正式模式已生效: 算法 $(systemctl is-active "$SVC")（enabled 自启）"
-    echo "   注意: 算法将按最小安全配置自主管理端口，可能关闭冗余/空载端口"
-    echo "   日志: tail -f ~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/algorithm_stdout.log"
+    rm -f "$GATE"
+    echo "== 正式模式：切换已开启（标记已移除），服务 $(systemctl is-active $SVC)"
+    echo "   注意: 算法将按最小安全配置真实切换 PDU 端口（可能关闭冗余/空载口）"
     ;;
   *)
+    if [ -f "$GATE" ]; then echo "当前: 测试模式（切换禁止）"; else echo "当前: 正式模式（切换允许）"; fi
     echo "用法: espur-switch.sh test|live"
     exit 1
     ;;
