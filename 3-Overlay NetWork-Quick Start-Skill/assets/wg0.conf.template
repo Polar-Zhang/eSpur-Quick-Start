@@ -1,0 +1,17 @@
+[Interface]
+# mesh IP 由管理员分配：lab 机器为 10.66.66.101-.199；终端为 10.66.66.2-.99
+Address = <MESH_IP>/24
+# 私钥由管理员生成下发，每台机器唯一。绝不提交到任何仓库！
+PrivateKey = <PEER_PRIVATE_KEY>
+# 跨境链路实测 1380；若大包丢/SSH 卡可再降到 1360
+MTU = 1380
+
+[Peer]
+# hub（新加坡 ECS）的公钥
+PublicKey = <HUB_PUBLIC_KEY>
+Endpoint = 47.237.111.211:51820
+# 实机（lab 机器）：只写 mesh 网段。绝对不能写 192.168.0.0/24 —— 那是本地网段，写入会导致实机失联！
+# 终端：除 mesh 网段外还要加各 lab 机器声明的子网，如 192.168.0.0/24
+AllowedIPs = 10.66.66.0/24
+# 双方都在 NAT 后，25s 保活维持映射
+PersistentKeepalive = 25
