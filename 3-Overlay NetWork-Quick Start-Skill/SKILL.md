@@ -26,7 +26,7 @@ description: 让学校机房实机一句话加入 eSpur overlay 组网（WireGua
 
 1. **私钥永远在实机本地生成，不出机、不入 Git。** token 模式下实机本地 `wg genkey`，只把公钥 POST 给 hub；hub 返回 mesh IP 和 hub 公钥。任何向你要私钥的流程都是错的。
 2. **实机的 `AllowedIPs` 必须只有 `10.66.66.0/24`，绝不能写 `192.168.0.0/24`。** 那是实机自己的本地网段，写进去会让本地路由被隧道吞掉，实机当场失联（PDU 也全部不可达）。join_mesh.sh 会自动拒绝这种配置。
-3. **校园网经常限制 UDP。** 症状：`wg show` 长时间无 handshake、`ping 10.66.66.1` 不通但 `ping 47.237.111.211` 通。join_mesh.sh 首次运行会自动尝试 443 备用端口；运行后的断线由看门狗自动恢复。人工排查见 `references/troubleshooting.md`。
+3. **隧道不通先判别丢包位置，别默认怀疑校园网。** 症状：`wg show` 长时间无 handshake、`ping 10.66.66.1` 不通但 `ping 47.237.111.211` 通。候选原因按 `references/troubleshooting.md` §0.5 两步法判别：hub 阿里云安全组漏放行 UDP（实测首日根因，更常见）或本地网络拦出站 UDP（本校园网实测**不**拦）。join_mesh.sh 首次运行会自动尝试 443 备用端口；运行后的断线由看门狗自动恢复。
 
 ## 一句话接入（token 模式，推荐）
 
@@ -86,8 +86,8 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 | 症状 | 原因与处理 |
 |---|---|
 | enroll 报 token expired/already used | token 15 分钟有效且一次性。让管理员重新 `issue` |
-| enroll 成功但报 `/etc/wireguard/wg0.conf: Permission denied` | 旧版脚本 bug：token 模式分支漏建 `/etc/wireguard` 目录，**且 token 已被消耗**。重新 issue + 用修复版（2026-10-21）重跑 |
-| 无 handshake，但 `ping 47.237.111.211` 通 | 先按 troubleshooting.md §0.5 判别丢包位置：STUN 通 + hub 全端口 timeout = **阿里云安全组没放行 UDP**（控制台加 51820/udp + 443/udp，放行后看门狗自动建联，无需新 token）；STUN 也不通才是校园网拦 UDP，看门狗会自动切 443 |
+| enroll 成功但报 `/etc/wireguard/wg0.conf: Permission denied` | 旧版脚本 bug（已修）：token 模式漏建 `/etc/wireguard` 目录，**且 token 已被消耗**。重新 issue 后用修复版脚本重跑 |
+| 无 handshake，但 `ping 47.237.111.211` 通 | 先按 troubleshooting.md §0.5 判别丢包位置：STUN 通 + hub 全端口 timeout = **hub 阿里云安全组没放行 UDP**（实测最常见根因；控制台加 51820/udp + 443/udp，放行后等看门狗重试，不通则重新 enroll）；STUN 也不通才是本地网络拦 UDP，看门狗会自动切 443 |
 | handshake 正常但 ping 不通 10.66.66.1 | 阿里云安全组未放行对应 UDP 端口，或客户端 PublicKey 与 hub 不匹配（重入模式换过钥），重新走一次 enroll |
 | 终端能 ping 实机，ping 不到 192.168.0.163 | 实机网关配置缺失。重跑 `join_mesh.sh`（幂等），或按 references/troubleshooting.md 第 3 条手动配。Debian 13/RPi OS 需先确认 iptables 已装（见 §3.5，缺失时 NAT 静默失效） |
 | 实机起隧道后整个失联 | AllowedIPs 写入了 192.168.0.0/24。token 模式不会发生（脚本强制）；文件模式脚本会拒绝。已发生时按 troubleshooting.md 第 4 条恢复 |
@@ -97,17 +97,10 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 
 完整排查手册见 `references/troubleshooting.md`。
 
-## 本 skill 的既成事实（2026-10-21 组网）
+## 本机既成事实（2026-10-21 lab-01 入网 ✅）
 
-- hub 已上线并三重开机自启：`wg-quick@hub`（51820）、`wg-quick@hub443`（443）、`espur-mesh-enroll`（注册 API，经 nginx `https://neowatt.cn/espur/api/mesh/` 暴露）。
+- hub（新加坡 47.237.111.211 = 10.66.66.1）三重开机自启：`wg-quick@hub`（51820/udp）、`wg-quick@hub443`（443/udp，同一密钥同一 peer 表）、`espur-mesh-enroll`（注册 API，经 nginx `https://neowatt.cn/espur/api/mesh/` 暴露）。阿里云安全组入方向已放行 51820/udp + 443/udp。
+- lab-01 = 本机（eSpur-5090，Raspberry Pi 4B / Raspberry Pi OS Lite trixie，wlan0 上外网、eth0 = 192.168.0.200/24）：已 enroll 为 10.66.66.101，wg-quick + 看门狗 enabled，网关职责（ip_forward + eth0 masquerade）在位，`ping -I 10.66.66.101 192.168.0.163` 验证过终端→实机→PDU 全路径。重入 = 管理员同名 `issue` + 本机重新 `--enroll`（mesh IP 不变、密钥轮换）。
 - `192.168.0.0/24` 已注册给 lab-01；新 lab 机器带**新**子网时在 issue 时声明，服务会做冲突检查。
-- lab-01 可走文件模式（配置在 hub 的 `/home/zp/espur-mesh/peers/lab-01/wg0.conf`）或 token 模式（issue 一个 `lab-01` 的 token 即可重入）。
-
-## 2026-10-21 lab-01（eSpur-5090 树莓派）实际接入记录（已入网 ✅）
-
-- 接入机：Raspberry Pi 4B / Raspberry Pi OS Lite trixie，wlan0 上外网、eth0 接实验室网段（192.168.0.200/24）。已 enroll 为 10.66.66.101，wg-quick + 看门狗 enabled。
-- 踩坑 1（脚本 bug，已修）：token 模式分支漏建 `/etc/wireguard` 目录 → 注册成功但写配置失败，token 被白白消耗一个。修复 = enroll 分支开头 `install -d -m 700 /etc/wireguard` 并用 `sudo tee` 写配置。
-- 踩坑 2（脚本加固，已修）：Debian 13/RPi OS 只预装 nftables，无 iptables 时第 5 步 NAT 静默失败（脚本不报错）。加固 = 缺失时自动 `apt/dnf install`，失败则 die。
-- 踩坑 3（hub 侧，已解决）：无 handshake 且只发不收时，不要急着怀疑校园网——用 troubleshooting.md §0.5 的两步法判别：STUN（stun.miwifi.com:3478）能回包 = 校园网放行任意出站 UDP；对 hub 未开服务端口（如 9999/udp）发包 timeout（而非 ICMP port-unreachable）= 阿里云安全组在静默丢包。本例即安全组漏放行；控制台补 51820/udp + 443/udp 入方向后，重新 enroll（换新 token、密钥轮换、mesh IP 不变）隧道数秒内建立，最终稳定在主端口 51820（校园网并未拦 UDP，此前判断"可能校园网拦截"是误报）。
-- 终验通过（2026-10-21）：`wg show wg0` handshake 正常、双向有流量；`ping 10.66.66.1` 通；`systemctl is-enabled wg-quick@wg0 espur-mesh-watchdog.timer` 均 enabled；`ping -I 10.66.66.101 192.168.0.163` 通（模拟广州终端流量穿过隧道→转发→masquerade→PDU 的完整路径）；NAT masquerade 规则在位。
-- sudo 提示：LCD skill 写的"免密 sudo 已配置"在该机重装后失效过一次；接入脚本需 root，先 `sudo -n true` 验证，不行就补 `/etc/sudoers.d/` NOPASSWD 或让用户 `sudo -v`。
+- 首次接入踩过三个坑（细节见 troubleshooting.md）：① 旧版脚本 token 模式漏建 `/etc/wireguard` 目录，注册成功却写不了配置，白耗一个 token（已修）② Debian 13/RPi OS 无 iptables 时 NAT 静默失效（已修，脚本自动补装）③ 无 handshake 的真因是阿里云安全组漏放行 UDP，不是校园网——本校园网实测放行任意出站 UDP（判别法 §0.5）。
+- 接入脚本需 root：先 `sudo -n true` 验证，不行让用户终端 `sudo -v` 或补 `/etc/sudoers.d/` NOPASSWD（该机重装系统后免密配置丢过一次）。
