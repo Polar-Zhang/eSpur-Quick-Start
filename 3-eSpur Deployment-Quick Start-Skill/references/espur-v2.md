@@ -6,6 +6,10 @@
 - 代码上游：私有仓 `Polar-Zhang/eSpur`（v2 全量）；skill 仓 `Polar-Zhang/eSpur-Quick-Start`（本 skill 的发布副本在 `3-eSpur Deployment-Quick Start-Skill/`）
 - 进程：`espur-algorithm.service`（systemd，enabled + Restart=always + RestartSec=10），stdout 追加到 `algorithm_stdout.log`
 - 防冻结：`espur-alg-watchdog.timer` 每 5 分钟检查日志 mtime，>900s 无输出自动重启服务
+- 模式切换（闸门方案）：算法服务常驻，部署目录下 `SWITCH_DISABLED` 标记文件存在即禁止
+  一切 PSU 切换（set_psu 只打日志不下发），遥测/上报照常；`espur-switch.sh test|live` 增删
+  标记（即时生效）。**只有 live 开启端口切换能力**；PDU 接测试负载（屏幕/充电器）时必须
+  保持 test。闸门代码在 src/psu.py 的 set_psu 开头（上游同步该文件后需重打）
 
 ## 启动 / 重启（唯一正确方式）
 
@@ -35,6 +39,7 @@ sudo systemctl restart espur-algorithm
 1. `config/config.ini` 绝不覆盖（含 bootstrap 写入的 api_key；上游模板键集合与部署版一致，若上游加键需手工合并）。
 2. `src/hal/snmp_pdu.py` 覆盖后重打实例级 total_power 语义：`total_power = sum(port_powers)`（文件内有注释标记；上游 0d932c0 的其余修复——OID/缩放/set 字符串化——与本地一致）。
 3. 同步后跑一次直读验证：`cd eSpur_v2/src && python3 -c "import sys; sys.path.insert(0,'.'); from hal.snmp_pdu import SNMPPDU; print(SNMPPDU().get_power_data().total_power)"`（有负载应 >0）。
+4. `src/psu.py` 覆盖后重打 `SWITCH_DISABLED` 闸门（set_psu 开头，模式切换语义；上游无此代码）。
 
 ## 平台接入（bootstrap，仅首次/凭证轮换时）
 

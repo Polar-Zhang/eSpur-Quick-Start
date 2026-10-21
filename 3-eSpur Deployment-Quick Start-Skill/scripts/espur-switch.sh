@@ -6,7 +6,7 @@
 set -u
 MODE="${1:-}"
 SVC=espur-algorithm
-GATE=/home/espur-5090/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/SWITCH_DISABLED
+GATE="${ESPUR_GATE:-$HOME/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/SWITCH_DISABLED}"
 
 systemctl enable "$SVC" >/dev/null 2>&1
 systemctl start "$SVC"

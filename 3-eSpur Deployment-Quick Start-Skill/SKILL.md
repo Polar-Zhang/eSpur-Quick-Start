@@ -20,7 +20,9 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 - v1 链（eSpur 主程序 + MySQL 云端 120.76.119.71）已废弃不再上报，但部署脚本（update_config 的实例布局约定）仍在用。
 - 组网与平台接入不属于本 skill：见 `2-Overlay NetWork-Quick Start-Skill`（完整链路：skill 2 组网 → 本 skill 部署 → skill 4 平台）。
 
-## 生死攸关的事实（六条）
+## 生死攸关的事实（七条）
+
+0. **只有正式模式（live）才开启端口切换能力——测试模式绝不启动算法的切换。** coarse 模式（本机默认）按「服务器 PSU 冗余」逻辑工作：总负载远小于单 PSU 额定（2000W）时会**关掉多余端口只留 1 个**。PDU 上接屏幕/充电器等非服务器测试负载时（2026-10-22 实际发生：两台测试负载被切断电），算法必须处于测试模式（`SWITCH_DISABLED` 闸门落下，见日常运维的 espur-switch.sh）。切换一律用 `espur-switch.sh`：`test` = 闸门落下（切换能力关闭，遥测/上报照常）；`live` = 闸门开启（切换能力开启），**仅当 PDU 接的是真实服务器 PSU、可接受端口被自动管理时才执行**。
 
 1. **PDU 有管理 ACL：SNMP 只响应源地址在 192.168.0.x 网段的请求。** 源地址不对时症状是「ARP 正常、SNMP/TCP/ICMP 全部无响应」，极易误判为 PDU 挂死。所以 eth0 必须静态配 192.168.0.200/24（netplan 持久化，见 references/deployment.md）。**任何「PDU 不响应」的排查第一步：`ip route get 192.168.0.163`，确认走 eth0 且 src 是 192.168.0.200。**
 2. **PDU 网口怕并发扫描**：254 并发的 SNMP 探测曾把它打挂过（重启 PDU 才恢复）。对它的一切探测必须串行、低速、带间隔。
@@ -60,11 +62,22 @@ sudo systemctl status espur-algorithm          # 状态（MainPID / active）
 sudo systemctl restart espur-algorithm         # 重启上报（改代码/配置后）
 tail -f ~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/algorithm_stdout.log  # 实时日志(-u 无缓冲)
 bash ~/.zcode/skills/espur-deploy/scripts/check_pdu.sh   # PDU 连通性体检（只读）
+
+**模式切换（闸门方案）**：算法服务常驻（遥测/决策/上报不断），部署目录下的
+`SWITCH_DISABLED` 标记文件控制切换能力；本机已装 `/usr/local/bin/espur-switch.sh`
+（skill 副本在 `scripts/`）：
+
+```bash
+# 远程一条命令切换（即时生效，无需重启算法）
+ssh -t espur-5090@10.66.66.101 "sudo /usr/local/bin/espur-switch.sh test"   # 测试模式：闸门落下，切换禁止（PDU 接测试负载时必须）
+ssh -t espur-5090@10.66.66.101 "sudo /usr/local/bin/espur-switch.sh live"   # 正式模式：切换开启（仅 PDU 接真实服务器 PSU 时用）
 ```
+
+闸门代码在 `src/psu.py` 的 set_psu 开头——上游同步该文件后需重打（见 espur-v2.md 同步铁律）。
 
 - 服务内部命令等价于 `python3 -u run.py --entry algorithm --mode real ... --duration 0 --publish-db`；`bootstrap_config.py --refresh` 可配 systemd ExecStartPre（可选，离线安全）。
 - 日志 COARSE 行间隔可达数百秒（打印对齐），不代表卡住；判活看 CPU 增量与到 47.237.111.211:443 的连接。
-- 数据验收在平台（设备卡片四口小图 + 详情页）。排障顺序：`references/espur-v2.md`（本机 systemd 运维 + 上报语义 + 同步铁律）→ `references/espur-v2.md`（部署与最低版本权威）→ `references/troubleshooting.md` 症状表。sudo 缓存过期（需要 root 时）让用户 `sudo -v`。
+- 数据验收在平台（设备卡片四口小图 + 详情页）。排障顺序：`references/espur-v2.md`（本机 systemd 运维 + 上报语义 + 模式切换 + 同步铁律 + 最低版本表）→ `references/troubleshooting.md` 症状表。sudo 缓存过期（需要 root 时）让用户 `sudo -v`。
 
 ## 本机既成事实
 
