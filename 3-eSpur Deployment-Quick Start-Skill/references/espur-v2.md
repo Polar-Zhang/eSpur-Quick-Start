@@ -40,6 +40,7 @@ sudo systemctl restart espur-algorithm
 2. `src/hal/snmp_pdu.py` 覆盖后重打实例级 total_power 语义：`total_power = sum(port_powers)`（文件内有注释标记；上游 0d932c0 的其余修复——OID/缩放/set 字符串化——与本地一致）。
 3. 同步后跑一次直读验证：`cd eSpur_v2/src && python3 -c "import sys; sys.path.insert(0,'.'); from hal.snmp_pdu import SNMPPDU; print(SNMPPDU().get_power_data().total_power)"`（有负载应 >0）。
 4. `src/psu.py` 覆盖后重打 `SWITCH_DISABLED` 闸门（set_psu 开头，模式切换语义；上游无此代码）。
+5. `src/hal/psu_snmp.py` 覆盖后重打三个接口方法的薄实现：`get_psu_info` / `get_all_psu_info` / `get_metrics`（上游抽象接口 `psu_interface.py` 要求实现但 `SNMPPSUManager` 缺失——上游 main 自身不自洽；缺失时 coarse 首次 set_psu 即 TypeError 进 crash loop。本地实现：实测字段填真实值，PSU 本体遥测以 0 填充）。
 
 ## 平台接入（bootstrap，仅首次/凭证轮换时）
 
