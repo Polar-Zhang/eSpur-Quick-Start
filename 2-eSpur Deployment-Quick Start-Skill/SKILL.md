@@ -5,7 +5,7 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 
 # eSpur 部署与排障
 
-最后验证：2026-10-21（lab-01 全链路：部署 → 组网 → 平台 → 单口曲线）。
+最后验证：2026-10-22（lab-01 重启自愈测试：systemd 自启 + 上报恢复全通过；进程冻结看门狗上线）。
 
 ## 系统结构（先建立心智模型）
 
@@ -20,11 +20,14 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 - v1 链（eSpur 主程序 + MySQL 云端 120.76.119.71）已废弃不再上报，但部署脚本（update_config 的实例布局约定）仍在用。
 - 组网与平台接入不属于本 skill：见 `3-Overlay NetWork-Quick Start-Skill`（完整链路：本 skill 部署 → skill 3 组网 → 平台接入）。
 
-## 生死攸关的三个事实
+## 生死攸关的事实（六条）
 
 1. **PDU 有管理 ACL：SNMP 只响应源地址在 192.168.0.x 网段的请求。** 源地址不对时症状是「ARP 正常、SNMP/TCP/ICMP 全部无响应」，极易误判为 PDU 挂死。所以 eth0 必须静态配 192.168.0.200/24（netplan 持久化，见 references/deployment.md）。**任何「PDU 不响应」的排查第一步：`ip route get 192.168.0.163`，确认走 eth0 且 src 是 192.168.0.200。**
 2. **PDU 网口怕并发扫描**：254 并发的 SNMP 探测曾把它打挂过（重启 PDU 才恢复）。对它的一切探测必须串行、低速、带间隔。
 3. **绝不运行 `test_pdu.py`**：它会从 1 到 8 口依次通断电源，会切断插在 PDU 上的设备。验证 PDU 用只读的 `snmpget`/`snmpwalk` 或本 skill 的 `scripts/check_pdu.sh`。
+4. **v2 启动命令必须带 `--publish-db`（默认 False 不上报！）和 `--duration 0`（0=无限）**，且用 `python3 -u`（无缓冲，否则 stdout 块缓冲导致日志不可见）。
+5. **算法由 systemd 托管（`espur-algorithm.service`），不要手工 kill+nohup**（会出现双进程争抢 SNMP 与重复上报）。操作一律 `sudo systemctl restart/status espur-algorithm`；防冻结看门狗 `espur-alg-watchdog.timer`（日志 >900s 无输出自动重启，实锤冻结场景见 troubleshooting.md）。
+6. **从上游同步 `src/hal/snmp_pdu.py` 后必须重打一处实例级语义**：`total_power = sum(port_powers)`（上游 0d932c0 用设备级 `.2.2.4.0` 全 PDU 合计，单 PDU 多实例时会把其它实例负载计入本实例；文件内有注释标记）。其余 OID/缩放/set 字符串化修复与上游一致。
 
 ## 代码来源
 
@@ -50,23 +53,21 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 
 完整逐步命令见 `references/deployment.md`：装依赖 → eth0 静态 IP → 改 config.ini / pdu_ip_ports-pid.json → deploy_eSpur_via_unzip.py → update_config.py → run_eSpur.py。
 
-## 日常运维（v2）
+## 日常运维（v2，systemd 托管）
 
 ```bash
-cd ~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2
-python3 run.py --entry algorithm --mode real --pdu-ip 192.168.0.163 \
-  --community-public public --community-private private \
-  --psu-count 4 --psu-power 2000 --duration 0        # 启动（长跑去掉 duration 限制按需）
-python3 scripts/bootstrap_config.py --refresh \
-  --config config/config.ini                          # 启动前刷新平台配置（可选，离线安全）
-tail -f log/*.log                                     # 实时日志（power= / psu= 每秒一行）
+sudo systemctl status espur-algorithm          # 状态（MainPID / active）
+sudo systemctl restart espur-algorithm         # 重启上报（改代码/配置后）
+tail -f ~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/algorithm_stdout.log  # 实时日志(-u 无缓冲)
 bash ~/.zcode/skills/espur-deploy/scripts/check_pdu.sh   # PDU 连通性体检（只读）
 ```
 
-数据验收在平台（设备卡片四口小图 + 详情页），排障先读 `references/v2-client.md`，
-再按 `references/troubleshooting.md` 对照。sudo 缓存过期（需要 root 时）让用户 `sudo -v`。
+- 服务内部命令等价于 `python3 -u run.py --entry algorithm --mode real ... --duration 0 --publish-db`；`bootstrap_config.py --refresh` 可配 systemd ExecStartPre（可选，离线安全）。
+- 日志 COARSE 行间隔可达数百秒（打印对齐），不代表卡住；判活看 CPU 增量与到 47.237.111.211:443 的连接。
+- 数据验收在平台（设备卡片四口小图 + 详情页）。排障顺序：`references/espur-v2.md`（本机 systemd 运维 + 上报语义 + 同步铁律）→ `references/v2-client.md`（部署与最低版本权威）→ `references/troubleshooting.md` 症状表。sudo 缓存过期（需要 root 时）让用户 `sudo -v`。
 
 ## 本机既成事实
 
-- **2026-10-21（当前）**：v2 客户端运行中，平台 external_id=1 在线，单口曲线在线（口 3 实测 62W 屏幕负载）。SNMP OID 修复（`0d932c0`）与单口上报（`3b42ece`）均已在本机代码中。平台：lab-01 / lab-01@espur.local。
+- **2026-10-22（当前）**：算法改由 systemd 托管（`espur-algorithm.service` enabled + `espur-alg-watchdog.timer` 防冻结，冻结场景实锤过一次：平台偶发挂起时同步 POST 冻结主循环）。整机重启测试通过：网络/systemd 自启/上报全自动恢复，~1.5 分钟内可达。节能率上报在首次 PSU 切换前恒 0（`decision_count > 0` 判定）；Pi 关机期间数据不产生、实时曲线缺失不补。
+- **2026-10-21**：v2 客户端运行中，平台 external_id=1 在线，单口曲线在线（口 3 实测 62W 屏幕负载）。SNMP OID 修复（`0d932c0`）与单口上报（`3b42ece`）均已在本机代码中。平台：lab-01 / lab-01@espur.local。
 - **2026-10-16（v1 部署期，历史）**：双实例布局（1-2-3-4 / 5-6-7-8）；MySQL 云端（120.76.119.71）部署当天即不可达，现已彻底废弃。手册在 `~/eSpur/eSpur部署完全手册.md`。

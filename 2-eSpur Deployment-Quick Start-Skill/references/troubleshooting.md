@@ -102,3 +102,31 @@ Web 和 SNMP 是两个独立进程，SNMP 正常而 Web 无响应 = Web 守护�
 ### 症状：update_config.py 后实例配置不对
 
 它按 json 的 key 顺序逐实例写 config，且 `instance_id`、`single_psu_max_power` 的 `-` 分隔列表**顺序必须与 json 的 key 顺序一致**。改完两边重跑 update_config.py。
+
+---
+
+# eSpur_v2 / 云平台运维相关（2026-10-22 增补）
+
+### 症状：进程在跑但平台没有新数据
+
+第一嫌疑：启动命令漏了 `--publish-db`（默认 False，数据只进本地缓冲，日志尾部有 "buffered ..." 统计）。第二嫌疑：config.ini 的 email/api_key 被平台轮换（管理员 regenerate 使旧 key 失效），重新 bootstrap 修正；验证凭证 `GET /espur/api/device-bootstrap/mine?email=...&api_key=...` 应 200。
+
+### 症状：算法进程活着但日志长时间无输出、采样停止（冻结）
+
+实锤场景：实时上报的同步 POST 在平台偶发挂起时冻结主循环，requests timeout 未兜底（`/proc/<pid>/task/*/syscall` 持续 73=ppoll、ESTAB Send-Q 有残留、CPU 不再增长）。兜底：`espur-alg-watchdog.timer` 每 5 分钟检查日志 mtime，>900s 无输出自动重启服务。手动恢复 `sudo systemctl restart espur-algorithm`。根治（上报改后台线程）待上游采纳。
+
+### 症状：从上游同步代码后功率读数归零（或 total 口径不对）
+
+读数全 0 = 同步到了旧版 snmp_pdu.py（见上文原因 B）。total_power 口径 = 同步后需重打实例级语义：`_get_power_data_cmd` 里 `total_power = sum(port_powers)`（不用设备级 `.2.2.4.0`，文件内有注释标记）。改完 `sudo systemctl restart espur-algorithm`。
+
+### 症状：节能率一直显示 -- / 0
+
+设计行为：`cur_save_ratio if decision_count > 0 else 0.0` —— 第一次 PSU 配置切换决策前上报恒 0（run_algorithm.py coarse 主循环）。日志里的 `save_ratio=0.0133` 是内部估计值，与上报值无关，勿混淆。
+
+### 症状：树莓派关机/重启后平台曲线有空洞
+
+预期行为：关机期间进程不存在、数据未产生，实时表逐条即发即弃，无从补起（全量历史表有 20 分钟批量补传，但实时曲线不读它）。恢复后曲线从新点继续；累计电量/节能统计从新 espur_start_time 重新累计。
+
+### 症状：平台 API 各种 401
+
+区分凭证：上报用 email+api_key（仅数据通道）；`/managed-instances/<id>/port-power` 等管理端点要管理员 JWT（api_key 会报 "invalid token format"）；`execute-sql` 只写不读（SELECT 报 "Unsupported legacy SQL"）。实机侧无法代看平台数据，验收找管理员或用 /mine 验凭证。

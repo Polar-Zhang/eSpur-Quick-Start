@@ -101,6 +101,7 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 
 - hub（新加坡 47.237.111.211 = 10.66.66.1）三重开机自启：`wg-quick@hub`（51820/udp）、`wg-quick@hub443`（443/udp，同一密钥同一 peer 表）、`espur-mesh-enroll`（注册 API，经 nginx `https://neowatt.cn/espur/api/mesh/` 暴露）。阿里云安全组入方向已放行 51820/udp + 443/udp。
 - lab-01 = 本机（eSpur-5090，Raspberry Pi 4B / Raspberry Pi OS Lite trixie，wlan0 上外网、eth0 = 192.168.0.200/24）：已 enroll 为 10.66.66.101，wg-quick + 看门狗 enabled，网关职责（ip_forward + eth0 masquerade）在位，`ping -I 10.66.66.101 192.168.0.163` 验证过终端→实机→PDU 全路径。重入 = 管理员同名 `issue` + 本机重新 `--enroll`（mesh IP 不变、密钥轮换）。
+- **开机快速自愈已加（2026-10-22）**：`wg0-bounce-onboot.service`（enabled）——开机 30 秒后检查 wg0 握手记录（`/usr/local/bin/wg0-handshake-check.sh`），从未握手即 bounce 接口。背景实测：wg-quick 开机正常拉起但首次握手偶发失败且 wg 不自动重试，远程通路因此中断 5 分钟（等看门狗周期兜底）；此服务把恢复窗口压到 ~1 分钟。重启预期不可达窗口按 ~1.5 分钟算。
 - `192.168.0.0/24` 已注册给 lab-01；新 lab 机器带**新**子网时在 issue 时声明，服务会做冲突检查。
 - 首次接入踩过三个坑（细节见 troubleshooting.md）：① 旧版脚本 token 模式漏建 `/etc/wireguard` 目录，注册成功却写不了配置，白耗一个 token（已修）② Debian 13/RPi OS 无 iptables 时 NAT 静默失效（已修，脚本自动补装）③ 无 handshake 的真因是阿里云安全组漏放行 UDP，不是校园网——本校园网实测放行任意出站 UDP（判别法 §0.5）。
 - 接入脚本需 root：先 `sudo -n true` 验证，不行让用户终端 `sudo -v` 或补 `/etc/sudoers.d/` NOPASSWD（该机重装系统后免密配置丢过一次）。
