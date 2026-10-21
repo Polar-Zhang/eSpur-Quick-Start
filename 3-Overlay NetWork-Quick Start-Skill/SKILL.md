@@ -103,10 +103,11 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 - `192.168.0.0/24` 已注册给 lab-01；新 lab 机器带**新**子网时在 issue 时声明，服务会做冲突检查。
 - lab-01 可走文件模式（配置在 hub 的 `/home/zp/espur-mesh/peers/lab-01/wg0.conf`）或 token 模式（issue 一个 `lab-01` 的 token 即可重入）。
 
-## 2026-10-21 lab-01（eSpur-5090 树莓派）实际接入记录
+## 2026-10-21 lab-01（eSpur-5090 树莓派）实际接入记录（已入网 ✅）
 
 - 接入机：Raspberry Pi 4B / Raspberry Pi OS Lite trixie，wlan0 上外网、eth0 接实验室网段（192.168.0.200/24）。已 enroll 为 10.66.66.101，wg-quick + 看门狗 enabled。
 - 踩坑 1（脚本 bug，已修）：token 模式分支漏建 `/etc/wireguard` 目录 → 注册成功但写配置失败，token 被白白消耗一个。修复 = enroll 分支开头 `install -d -m 700 /etc/wireguard` 并用 `sudo tee` 写配置。
 - 踩坑 2（脚本加固，已修）：Debian 13/RPi OS 只预装 nftables，无 iptables 时第 5 步 NAT 静默失败（脚本不报错）。加固 = 缺失时自动 `apt/dnf install`，失败则 die。
-- 踩坑 3（hub 侧）：无 handshake 且只发不收时，不要急着怀疑校园网——用 troubleshooting.md §0.5 的两步法判别：STUN（stun.miwifi.com:3478）能回包 = 校园网放行任意出站 UDP；对 hub 未开服务端口（如 9999/udp）发包 timeout（而非 ICMP port-unreachable）= 阿里云安全组在静默丢包。本例即安全组漏放行，控制台补 51820/udp + 443/udp 后隧道自动建立。
+- 踩坑 3（hub 侧，已解决）：无 handshake 且只发不收时，不要急着怀疑校园网——用 troubleshooting.md §0.5 的两步法判别：STUN（stun.miwifi.com:3478）能回包 = 校园网放行任意出站 UDP；对 hub 未开服务端口（如 9999/udp）发包 timeout（而非 ICMP port-unreachable）= 阿里云安全组在静默丢包。本例即安全组漏放行；控制台补 51820/udp + 443/udp 入方向后，重新 enroll（换新 token、密钥轮换、mesh IP 不变）隧道数秒内建立，最终稳定在主端口 51820（校园网并未拦 UDP，此前判断"可能校园网拦截"是误报）。
+- 终验通过（2026-10-21）：`wg show wg0` handshake 正常、双向有流量；`ping 10.66.66.1` 通；`systemctl is-enabled wg-quick@wg0 espur-mesh-watchdog.timer` 均 enabled；`ping -I 10.66.66.101 192.168.0.163` 通（模拟广州终端流量穿过隧道→转发→masquerade→PDU 的完整路径）；NAT masquerade 规则在位。
 - sudo 提示：LCD skill 写的"免密 sudo 已配置"在该机重装后失效过一次；接入脚本需 root，先 `sudo -n true` 验证，不行就补 `/etc/sudoers.d/` NOPASSWD 或让用户 `sudo -v`。
