@@ -73,7 +73,19 @@ sudo systemctl enable --now espur-frontend   # next start 127.0.0.1:3000
   systemd 单元 espur-mesh-enroll（127.0.0.1:8443，root 运行）
 - 工具链手册：hub 本机 `/home/zp/espur-mesh/README.md`
 
-## 8. 验收
+## 8. 数据保留策略（迁移 0023 起，每小时巡检自动执行）
+
+| 数据 | 策略 |
+|---|---|
+| legacy_realtime_power_time | 7 天滚动 → 归档搬入 legacy_power_time |
+| legacy_power_time / legacy_port_power_time（1Hz 原始） | 保留 90 天 → 按小时聚合进 legacy_power_hourly / legacy_port_power_hourly 后删除原始行 |
+| legacy_power_hourly / legacy_port_power_hourly | 永久（每天 24 行/口，体积可忽略） |
+| legacy_ingest_records（上报审计） | 保留 14 天 |
+
+常量：HISTORY_RAW_DAYS / INGEST_LOG_DAYS / ONLINE_OFFLINE_AFTER_SECONDS（30s 判离线），
+均在 services/realtime_retention.py 与 main.py。聚合逻辑幂等（UNIQUE + ON CONFLICT）。
+
+## 9. 验收
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" https://neowatt.cn/espur/instances      # 200

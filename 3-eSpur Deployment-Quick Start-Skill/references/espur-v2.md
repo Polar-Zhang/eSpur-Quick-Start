@@ -88,6 +88,7 @@ token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写�
 | set_psu 字符串 ON/OFF | 同上 | `grep -c 's {state_str}' src/hal/snmp_pdu.py` ≥1 |
 | 单口功率上报 | `3b42ece` | `grep -c "port_powers" src/run_algorithm.py` ≥3 |
 | 节能率未优化时报 0 | `dd1dcff` | `grep -c "decision_count > 0" src/run_algorithm.py` ≥1 |
+| 实时观测缓冲封顶（树莓派内存） | `9bd948c` | `grep -c "realtime_power_cache_max" src/data/duckdb_client.py` ≥1 |
 | 上报证书回落 | `248a76d` | config.ini 的 `duckdb_ssl_path` 留空即可 |
 
 ## 已知坑与口径
