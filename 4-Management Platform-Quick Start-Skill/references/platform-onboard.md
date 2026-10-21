@@ -1,6 +1,6 @@
 # eSpur 实机接入平台（配置中心模式，方案 B）
 
-实机接入管理平台（https://neowatt.cn/espur）上报数据。前提：组网已通（见 `3-Overlay NetWork-Quick Start-Skill`）、eSpur 已部署。
+实机接入管理平台（https://neowatt.cn/espur）上报数据。前提：组网已通（见 `2-Overlay NetWork-Quick Start-Skill`）、eSpur 已部署。
 
 **实机侧只有一条命令**（token 由平台生成）：
 

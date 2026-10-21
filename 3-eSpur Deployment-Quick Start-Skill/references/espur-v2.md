@@ -3,7 +3,7 @@
 ## 部署形态
 
 - 位置：`~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/`（run.py + src/ + scripts/ + config/）
-- 代码上游：私有仓 `Polar-Zhang/eSpur`（v2 全量）；skill 仓 `Polar-Zhang/eSpur-Quick-Start`（本 skill 的发布副本在 `2-eSpur Deployment-Quick Start-Skill/`）
+- 代码上游：私有仓 `Polar-Zhang/eSpur`（v2 全量）；skill 仓 `Polar-Zhang/eSpur-Quick-Start`（本 skill 的发布副本在 `3-eSpur Deployment-Quick Start-Skill/`）
 - 进程：`espur-algorithm.service`（systemd，enabled + Restart=always + RestartSec=10），stdout 追加到 `algorithm_stdout.log`
 - 防冻结：`espur-alg-watchdog.timer` 每 5 分钟检查日志 mtime，>900s 无输出自动重启服务
 
@@ -63,3 +63,35 @@ token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写�
 - 节能率：第一次 PSU 切换决策前上报恒 0（`decision_count > 0` 判定）；日志 save_ratio 是内部估计值。
 - total_power 是**实例级**（本实例 4 口之和），非设备级全 PDU 合计 —— 同步 snmp_pdu.py 后必须保留该语义。
 - duckdb_ssl_path 必须为空：requests verify=falsy 跳过自签证书校验（平台证书链限制）。
+
+
+## 目录布局
+
+```
+~/eSpur/eSpur-deployment/
+├── 192.168.0.163_1-2-3-4/          # 实例目录 = PDU_IP_端口段
+│   └── eSpur_v2/                   # v2 客户端（实际运行的一份）
+│       ├── config/config.ini       # 算法参数 + 云平台字段
+│       ├── scripts/bootstrap_config.py
+│       ├── src/
+│       └── run.py
+└── config.ini / pdu_ip_ports-pid.json   # v1 遗留，v2 只参考布局约定
+```
+
+多实例沿用 v1 约定：config.ini 的 `instance_id = 1-2` 由 update_config.py 分发到各实例目录。
+
+## 最低代码版本（缺一则对应功能缺失）
+
+| 功能 | 修复 commit | 本机自检 grep |
+|---|---|---|
+| SNMP 读数不全 0（OID 修复） | `0d932c0` | `grep -c "2.3.{port}.0" src/hal/snmp_pdu.py` ≥1 |
+| set_psu 字符串 ON/OFF | 同上 | `grep -c 's {state_str}' src/hal/snmp_pdu.py` ≥1 |
+| 单口功率上报 | `3b42ece` | `grep -c "port_powers" src/run_algorithm.py` ≥3 |
+| 节能率未优化时报 0 | `dd1dcff` | `grep -c "decision_count > 0" src/run_algorithm.py` ≥1 |
+| 上报证书回落 | `248a76d` | config.ini 的 `duckdb_ssl_path` 留空即可 |
+
+## 已知坑与口径
+
+- `duckdb_ssl_path` 非空且文件不存在 → 所有上报抛 OSError 且只打 warning（248a76d 修复的隐蔽坑）。
+- 平台存储口径：power 与 cur_save_ratio 均 ×100 整数；平台前端负责还原——自写脚本读平台 API 记得除回来。
+- 未优化时节能率上报 0（平台显示 --），见 dd1dcff；日志 save_ratio 是内部估计值，仅供算法内部使用。

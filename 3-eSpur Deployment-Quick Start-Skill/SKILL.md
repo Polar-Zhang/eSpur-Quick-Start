@@ -18,7 +18,7 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 
 - 当前运行形态是 **eSpur_v2 real 模式**：一个「实例」= PDU 上一组端口 = 平台一个 external_id。本机布局：`192.168.0.163_1-2-3-4`（平台 external_id=1）。
 - v1 链（eSpur 主程序 + MySQL 云端 120.76.119.71）已废弃不再上报，但部署脚本（update_config 的实例布局约定）仍在用。
-- 组网与平台接入不属于本 skill：见 `3-Overlay NetWork-Quick Start-Skill`（完整链路：本 skill 部署 → skill 3 组网 → 平台接入）。
+- 组网与平台接入不属于本 skill：见 `2-Overlay NetWork-Quick Start-Skill`（完整链路：skill 2 组网 → 本 skill 部署 → skill 4 平台）。
 
 ## 生死攸关的事实（六条）
 
@@ -33,7 +33,7 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 
 | 内容 | 来源 | 说明 |
 |---|---|---|
-| eSpur_v2 客户端（当前运行） | `github.com/Polar-Zhang/eSpur`（`eSpur_v2/` 子目录） | 本网络可达，codeload tarball 同步实测可用；**最低版本见 references/v2-client.md 的版本表** |
+| eSpur_v2 客户端（当前运行） | `github.com/Polar-Zhang/eSpur`（`eSpur_v2/` 子目录） | 本网络可达，codeload tarball 同步实测可用；**最低版本见 references/espur-v2.md 的版本表** |
 | v1 部署脚本（布局约定） | skill 自带 `assets/eSpur-code-snapshot.zip`（2026-10-16） | 含 eSpur-deployment 脚本与模板配置；update_config.py 的多实例分发仍在用 |
 
 上游旧仓库（guomingtang/eSpur、beerjtu/eSpur-deployment）已由 Polar-Zhang/eSpur 收编，不要再用。
@@ -43,10 +43,10 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 ### v2 客户端（主线，当前实际形态）
 
 部署目录约定、启动命令、config.ini 云平台字段、**最低代码版本表**、已知坑
-见 `references/v2-client.md`——那是 v2 的权威文档。概要：
+见 `references/espur-v2.md`——那是 v2 的权威文档。概要：
 
 1. 同步 `eSpur_v2/` 到实例目录（`~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2`）。
-2. 平台 bootstrap token 写配置（`scripts/bootstrap_config.py --token`，见 skill 3 的 platform-onboard.md）。
+2. 平台 bootstrap token 写配置（`scripts/bootstrap_config.py --token`，见 skill 4 的 platform-onboard.md）。
 3. `python3 run.py --entry algorithm --mode real --pdu-ip 192.168.0.163 ... --duration 0` 先零时长冒烟，再长跑。
 
 ### v1 链（遗留，仅布局约定仍被引用）
@@ -64,7 +64,7 @@ bash ~/.zcode/skills/espur-deploy/scripts/check_pdu.sh   # PDU 连通性体检�
 
 - 服务内部命令等价于 `python3 -u run.py --entry algorithm --mode real ... --duration 0 --publish-db`；`bootstrap_config.py --refresh` 可配 systemd ExecStartPre（可选，离线安全）。
 - 日志 COARSE 行间隔可达数百秒（打印对齐），不代表卡住；判活看 CPU 增量与到 47.237.111.211:443 的连接。
-- 数据验收在平台（设备卡片四口小图 + 详情页）。排障顺序：`references/espur-v2.md`（本机 systemd 运维 + 上报语义 + 同步铁律）→ `references/v2-client.md`（部署与最低版本权威）→ `references/troubleshooting.md` 症状表。sudo 缓存过期（需要 root 时）让用户 `sudo -v`。
+- 数据验收在平台（设备卡片四口小图 + 详情页）。排障顺序：`references/espur-v2.md`（本机 systemd 运维 + 上报语义 + 同步铁律）→ `references/espur-v2.md`（部署与最低版本权威）→ `references/troubleshooting.md` 症状表。sudo 缓存过期（需要 root 时）让用户 `sudo -v`。
 
 ## 本机既成事实
 
