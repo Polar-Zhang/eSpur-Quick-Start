@@ -23,11 +23,11 @@ python3 eSpur_v2/scripts/bootstrap_config.py --token dboot-xxxx
 - 组网隧道（10.66.66.x）只承载人的远程操作（SSH/PDU Web），上报流量不进隧道。
 - 客户端 `constant.py` 在 import 时一次性读 `config.ini`——所以配置同步做在"启动前"（bootstrap/refresh 写文件），算法本体不联网取配置，平台失联不影响算法运行。
 
-## 平台侧操作（管理员，浏览器 + 可选 curl）
+## 平台侧操作（管理员）
 
-1. **登记设备**：实例页 → 「登记实机」→ 填设备名（lab-01）、版本、位置、IP（填 mesh IP `10.66.66.101`）。
-2. **创建实例**：设备详情 → 创建实例，命名约定 `192.168.0.163_1-2-3-4`（PDU_IP_端口段），记下 `external_id`（即 instance_id）。
-3. **签发 bootstrap token**（一次性、24 小时有效）：
+1. **登记设备**：实例页 → 「登记实机」→ 填设备名（lab-01）、版本、位置、IP（填 mesh IP `10.66.66.101`）。实例名自动按 `PDU IP_端口段` 约定生成。
+2. **创建实例**：登记弹窗已自动创建（每台设备一个实例），`external_id` 即实机的 instance_id。
+3. **签发 bootstrap token**（一次性、24 小时有效）——**UI（推荐）**：设备详情页 → 「实机接入」→ 可选填上报邮箱 → 「生成接入 Token」→ 复制页面给出的实机命令。API 备选：
 
    ```bash
    curl -s -X POST https://neowatt.cn/espur/api/device-bootstrap/tokens \
