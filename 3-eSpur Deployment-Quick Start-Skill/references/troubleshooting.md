@@ -130,3 +130,13 @@ Web 和 SNMP 是两个独立进程，SNMP 正常而 Web 无响应 = Web 守护�
 ### 症状：平台 API 各种 401
 
 区分凭证：上报用 email+api_key（仅数据通道）；`/managed-instances/<id>/port-power` 等管理端点要管理员 JWT（api_key 会报 "invalid token format"）；`execute-sql` 只写不读（SELECT 报 "Unsupported legacy SQL"）。实机侧无法代看平台数据，验收找管理员或用 /mine 验凭证。
+
+### 症状：整机对所有通路同时下线（局域网 SSH + wg + 平台全断），现场强制重启才恢复
+
+2026-10-22 17:00 实际发生（前次稳定运行 13.5 小时）。取证边界与结论：算法日志（落盘）无任何失败告警、17:11:31 批量 flush 后再无活动 —— **整机软挂死**（挂死来得太快，进程连"发现网络失败"的机会都没有），根因因 journal 未持久化而不可考；内存/OOM 已排除（3.7G + 2G zram，余量充足）。
+
+**已加固（2026-10-22）：**
+- journal 持久化：`/etc/systemd/journald.conf` → `Storage=persistent`，日志落 `/var/log/journal`，重启后可查上次死因（`journalctl -b -1 -n 200`）
+- 硬件看门狗：`/etc/systemd/system.conf` → `RuntimeWatchdogSec=1min`（systemd 喂 `/dev/watchdog`/bcm2835_wdt，整机 hang 1 分钟自动重启，无需现场断电）；重装备后需重新设置
+
+遇同类问题：恢复后先 `journalctl -b -1 -n 200` 与 `ls /sys/fs/pstore/` 找死因，再查 `systemctl show -p RuntimeWatchdogUSec`（应非 0）确认看门狗在岗。
