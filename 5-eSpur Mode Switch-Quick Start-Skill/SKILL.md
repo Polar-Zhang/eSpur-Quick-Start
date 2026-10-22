@@ -24,14 +24,17 @@ description: eSpur 测试/生产双模式切换：PSU 切换闸门（test 闸门
 ## 切换操作（一条命令，即时生效无需重启）
 
 ```bash
-# 本机直接执行，或远程一条命令
-sudo /usr/local/bin/espur-switch.sh test    # 测试模式（闸门落下）
-sudo /usr/local/bin/espur-switch.sh live    # 生产模式（闸门开启）
-sudo /usr/local/bin/espur-switch.sh         # 查看当前模式
+sudo /usr/local/bin/espur-switch.sh test                      # 测试模式（闸门落下，遥测照常）
+sudo /usr/local/bin/espur-switch.sh live                      # 生产模式（仅闸门开启）
+sudo /usr/local/bin/espur-switch.sh live 10.123.4.246/22 10.123.7.254
+                                # 生产模式 + 一次性配好你提供的上联业务 IP（保底手动命令）
+sudo /usr/local/bin/espur-switch.sh                           # 查看当前模式
 ```
 
-- 脚本在本 skill `scripts/espur-switch.sh`，实机安装于 `/usr/local/bin/`
-- 远程切换：`ssh -t <用户>@<实机IP> "sudo /usr/local/bin/espur-switch.sh live"`
+- 脚本在本 skill `scripts/espur-switch.sh`，实机安装于 `/usr/local/bin/`（更新后重拷一次）
+- `live` 带 IP 参数：闸门开启 + 上联 USB 口写入你提供的业务 IP 并立即激活
+  （首次必须带网关；IP 变更时重跑即更新）
+- 远程切换：`ssh -t <用户>@<实机IP> "sudo /usr/local/bin/espur-switch.sh live ..."`
 
 ## 上联业务 IP（重要：IP 一律由用户提供）
 
