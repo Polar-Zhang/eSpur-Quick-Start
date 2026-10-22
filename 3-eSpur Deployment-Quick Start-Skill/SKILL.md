@@ -63,17 +63,9 @@ sudo systemctl restart espur-algorithm         # 重启上报（改代码/配置
 tail -f ~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/algorithm_stdout.log  # 实时日志(-u 无缓冲)
 bash ~/.zcode/skills/espur-deploy/scripts/check_pdu.sh   # PDU 连通性体检（只读）
 
-**模式切换（闸门方案）**：算法服务常驻（遥测/决策/上报不断），部署目录下的
-`SWITCH_DISABLED` 标记文件控制切换能力；本机已装 `/usr/local/bin/espur-switch.sh`
-（skill 副本在 `scripts/`）：
-
-```bash
-# 远程一条命令切换（即时生效，无需重启算法）
-ssh -t espur-5090@10.66.66.101 "sudo /usr/local/bin/espur-switch.sh test"   # 测试模式：闸门落下，切换禁止（PDU 接测试负载时必须）
-ssh -t espur-5090@10.66.66.101 "sudo /usr/local/bin/espur-switch.sh live"   # 正式模式：切换开启（仅 PDU 接真实服务器 PSU 时用）
-```
-
-闸门代码在 `src/psu.py` 的 set_psu 开头——上游同步该文件后需重打（见 espur-v2.md 同步铁律）。
+**模式切换（test/live）与上联业务 IP**：统一由 skill 5（`5-eSpur Mode Switch-Quick Start-Skill`）管理——
+闸门语义与实测事故见上方规则 0，切换命令、业务 IP 配置（IP 由使用者提供）见 skill 5 的 SKILL.md；
+闸门代码在 `src/psu.py` 的 set_psu 开头，上游同步该文件后需重打（espur-v2.md 同步铁律 4）。
 
 - 服务内部命令等价于 `python3 -u run.py --entry algorithm --mode real ... --duration 0 --publish-db`；`bootstrap_config.py --refresh` 可配 systemd ExecStartPre（可选，离线安全）。
 - 日志 COARSE 行间隔可达数百秒（打印对齐），不代表卡住；判活看 CPU 增量与到 47.237.111.211:443 的连接。

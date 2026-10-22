@@ -15,6 +15,7 @@ description: eSpur 项目全流程总控入口。先判定当前是管理侧（�
 | 2 | `2-Overlay NetWork-Quick Start-Skill` | WireGuard 组网接入 + 看门狗 | 设备侧 + 人的终端 |
 | 3 | `3-eSpur Deployment-Quick Start-Skill` | eSpur_v2 客户端部署与运维 | 设备侧 |
 | 4 | `4-Management Platform-Quick Start-Skill` | 管理端（neowatt.cn）部署/更新/运维 | 管理侧 |
+| 5 | `5-eSpur Mode Switch-Quick Start-Skill` | 测试/生产模式切换 + 上联业务 IP 配置（IP 由使用者提供） | 设备侧 |
 
 完整链路（新设备从零到平台出数）：
 **1（有屏才做）→ 2 组网（远程优先）→ 3 部署 v2 客户端 → 4 平台接入（管理员生成 Token，实机一条命令）**
@@ -82,6 +83,11 @@ PDU 网段静态 IP（eth0 192.168.0.200/24）+ 代码同步（codeload 通道�
 管理员在平台设备详情页生成接入 Token（UI）→ 实机
 `python3 eSpur_v2/scripts/bootstrap_config.py --token dboot-xxx` →
 自动建号授权并开始上报。验收：平台设备卡片在线 + 四口小图出点。
+
+**⑤ 模式切换（进入正式运行前必做）**
+
+PDU 接真实服务器 PSU 后，切生产模式：`espur-switch.sh live`（闸门开启，算法开始
+真实优化）；接测试负载调试时保持 test。见 skill 5。
 
 ## 快速排障路由
 

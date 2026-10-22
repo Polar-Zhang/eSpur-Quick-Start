@@ -11,6 +11,7 @@ eSpur 项目的全套部署/运维 skill：从一台全新的树莓派到云平�
 | 2 | `2-Overlay NetWork-Quick Start-Skill` | WireGuard 组网：一键接入、看门狗自愈 | 设备 + 终端 |
 | 3 | `3-eSpur Deployment-Quick Start-Skill` | eSpur_v2 客户端部署（PDU SNMP + 平台上报） | 设备 |
 | 4 | `4-Management Platform-Quick Start-Skill` | 管理端全栈部署/更新/运维 + 设备接入管理 | 管理端 |
+| 5 | `5-eSpur Mode Switch-Quick Start-Skill` | 测试/生产模式切换 + 上联业务 IP 配置 | 设备 |
 
 新设备标准流程：**1（接了屏才做）→ 2 组网 → 3 部署 → 4 平台接入**。
 不确定从哪开始：直接用 0 号总控，它会先判定你在管理侧还是设备侧。

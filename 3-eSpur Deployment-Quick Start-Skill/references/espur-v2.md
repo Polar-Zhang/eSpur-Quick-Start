@@ -6,10 +6,9 @@
 - 代码上游：私有仓 `Polar-Zhang/eSpur`（v2 全量）；skill 仓 `Polar-Zhang/eSpur-Quick-Start`（本 skill 的发布副本在 `3-eSpur Deployment-Quick Start-Skill/`）
 - 进程：`espur-algorithm.service`（systemd，enabled + Restart=always + RestartSec=10），stdout 追加到 `algorithm_stdout.log`
 - 防冻结：`espur-alg-watchdog.timer` 每 5 分钟检查日志 mtime，>900s 无输出自动重启服务
-- 模式切换（闸门方案）：算法服务常驻，部署目录下 `SWITCH_DISABLED` 标记文件存在即禁止
-  一切 PSU 切换（set_psu 只打日志不下发），遥测/上报照常；`espur-switch.sh test|live` 增删
-  标记（即时生效）。**只有 live 开启端口切换能力**；PDU 接测试负载（屏幕/充电器）时必须
-  保持 test。闸门代码在 src/psu.py 的 set_psu 开头（上游同步该文件后需重打）
+- 模式切换（闸门方案）：算法服务常驻，`SWITCH_DISABLED` 标记文件控制切换能力，
+  **只有 live 开启端口切换**。切换操作与业务 IP 配置统一见 skill 5
+  （5-eSpur Mode Switch）；闸门代码在 src/psu.py 的 set_psu 开头（上游同步该文件后需重打）
 
 ## 启动 / 重启（唯一正确方式）
 
