@@ -8,7 +8,10 @@
 set -u
 MODE="${1:-}"
 SVC=espur-algorithm
-GATE="${ESPUR_GATE:-$HOME/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/SWITCH_DISABLED}"
+# 闸门路径按"真实登录用户"的家目录解析（sudo 下 $HOME=/root 会指错，曾致状态误报与 live 静默失效）
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+GATE="${ESPUR_GATE:-$REAL_HOME/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/SWITCH_DISABLED}"
 
 systemctl enable "$SVC" >/dev/null 2>&1
 systemctl start "$SVC"
