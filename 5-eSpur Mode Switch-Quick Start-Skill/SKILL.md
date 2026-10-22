@@ -36,6 +36,12 @@ sudo /usr/local/bin/espur-switch.sh                           # 查看当前模�
   （首次必须带网关；IP 变更时重跑即更新）
 - 远程切换：`ssh -t <用户>@<实机IP> "sudo /usr/local/bin/espur-switch.sh live ..."`
 
+## 机房部署前置加固（2026-10-23 已在实机应用）
+
+- 上联走 USB 转接网口（enx*，交换机直连）：已装 udev 规则 `/etc/udev/rules.d/90-usb-net-nosuspend.rules` 禁用其 USB 自动省电（RTL8152/AX88179 类芯片的 autosuspend 会偶发断连），网卡插入即自动应用，无需手动。
+- 无线唤醒类问题（AP 漫游管理/踢站）在机房有线接入下不存在；测试环境的对应缓解（wlan0 关省电）仅适用于测试环境。
+- 挂死兜底（硬件看门狗 1min + journal 持久化）在机房同样生效。
+
 ## 上联业务 IP（重要：IP 一律由用户提供）
 
 **本 skill 与所有脚本绝不猜测、不自动分配任何 IP。** 上联口（USB 转接网口）的
