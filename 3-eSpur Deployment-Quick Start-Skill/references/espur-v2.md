@@ -94,6 +94,7 @@ token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写�
 | psu 接口三方法（get_psu_info 等） | `9a27e65` | `grep -c "def get_metrics" src/hal/psu_snmp.py` ≥1 |
 | 节能率未优化时报 0 | `dd1dcff` | `grep -c "decision_count > 0" src/run_algorithm.py` ≥1 |
 | 实时观测缓冲封顶（树莓派内存） | `9bd948c` | `grep -c "realtime_power_cache_max" src/data/duckdb_client.py` ≥1 |
+| 测试模式节能率报 0 | `7d80207` | `grep -c "_SWITCH_GATE" src/run_algorithm.py` ≥3 |
 | 上报证书回落 | `248a76d` | config.ini 的 `duckdb_ssl_path` 留空即可 |
 
 ## 已知坑与口径
