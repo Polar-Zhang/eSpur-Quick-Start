@@ -60,10 +60,15 @@ sudo /usr/local/bin/espur-switch.sh                           # 查看当前模�
 
 ```bash
 sudo ./scripts/config-uplink.sh <接口名> <IP/22> <网关> [DNS]
-# 例: sudo ./scripts/config-uplink.sh enx9c8e99abcd12 10.123.4.246/22 10.123.7.254
+# 例（通配，任意 USB 转接网卡插入即接管，推荐）:
+sudo ./scripts/config-uplink.sh "enx*" 10.123.4.246/22 10.123.7.254
+# 例（指定具体接口）:
+sudo ./scripts/config-uplink.sh enx9c8e99abcd12 10.123.4.246/22 10.123.7.254
 ```
 
-- 配置写入后处于**待接入态**：网线未插不会激活，插上交换机自动启用
+- **`enx*` 通配**（NetworkManager 原生支持）：无需预知 USB 网卡接口名，
+  不抢 eth0（PDU 专用）/wlan0——lab-01 已按此预配置 jifang 连接（2026-10-25）
+- 配置写入后处于**待接入态**：网卡未插不会激活，插上交换机自动启用
 - IP 后续变更：改用新值重跑本命令即可（幂等，同 profile 更新）
 - **现场免调试**：插 PDU 线（eth0）→ 插上联线（USB 口）→ 上电，三步完成
 

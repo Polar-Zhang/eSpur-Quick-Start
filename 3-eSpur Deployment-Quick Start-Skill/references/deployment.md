@@ -145,11 +145,19 @@ time snmpwalk -v1 -c public 192.168.0.163 .1.3.6.1.4.1.23273
 [机房交换机] —网线—→ [Pi USB 转接网口: 10.123.4.246/22，网关 10.123.7.254]  上联面（上报+mesh+远程）
 ```
 
-- USB 转接网口为原型机自带（无需额外硬件）；接口名为 enx<MAC>（按网卡固定，重启不漂移）；配置走 nmcli
-  （`con add ... ipv4.addresses 10.123.4.246/22 ipv4.gateway 10.123.7.254 ipv4.dns ...`）
+- USB 转接网口为原型机自带（无需额外硬件）。**jifang 连接已预配置**（2026-10-25）：
+  `nmcli con show jifang` 应为 manual 10.123.4.246/22 + 网关 10.123.7.254 + autoconnect，
+  **ifname 绑定通配 `enx*`**——任意 USB 转接网卡插入即被接管，无需预知接口名，不抢 eth0/wlan0
+- 受限 sudo 免密已配置（/etc/sudoers.d/espur-ops，用户 espur-5090）：
+  nmcli 全部 + `systemctl restart/status espur-algorithm` + `systemctl restart wg-quick@wg0`——
+  远程运维（hub 经 mesh SSH）可完成网络配置与算法/隧道重启，其余仍需密码
 - eth0 静态配置无网关，上联默认路由只有 USB 口一条，无冲突；配完 `ip route` 核对
 - PDU 的 config.ini `pdu_ip = 192.168.0.163` 不变（直连控制面），实例命名约定不变
-- 验收顺序：USB 口拿到 IP → `ip route get 192.168.0.163` → snmpget PDU 应答 →
-  `ping neowatt.cn` 出网 → 平台翻回在线
+- **现场流程（终版，2026-10-25）**：① USB 转接网卡插树莓派，网线连转接网卡 ↔ 交换机；
+  ② eth0 网线连 PDU（随整机搬运，本就连着）；③ 上电等 ~2 分钟（网络→服务→算法→上报全自动）
+- 验收顺序（SSH 或管理员从服务端远程确认）：`ip -4 addr show enx*` 拿到 10.123.4.246 →
+  `ping -c3 neowatt.cn` 出网 → `ip route get 192.168.0.163` 走 eth0 →
+  `systemctl status espur-algorithm` → 平台翻在线 + 四口曲线恢复
+- 保底（预配置失效时）：`sudo bash config-uplink.sh "enx*" 10.123.4.246/22 10.123.7.254`（通配同样适用）
 - 出站策略是唯一未知数：TCP 443（上报）通常放行；UDP 被拦时 mesh 自动切 443 兜底
 - 硬件看门狗已就位（挂死 1 分钟自愈），机房无人值守场景可依赖
