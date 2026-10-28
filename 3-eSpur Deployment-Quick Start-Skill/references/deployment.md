@@ -159,5 +159,15 @@ time snmpwalk -v1 -c public 192.168.0.163 .1.3.6.1.4.1.23273
   `ping -c3 neowatt.cn` 出网 → `ip route get 192.168.0.163` 走 eth0 →
   `systemctl status espur-algorithm` → 平台翻在线 + 四口曲线恢复
 - 保底（预配置失效时）：`sudo bash config-uplink.sh "enx*" 10.123.4.246/22 10.123.7.254`（通配同样适用）
-- 出站策略是唯一未知数：TCP 443（上报）通常放行；UDP 被拦时 mesh 自动切 443 兜底
+- **出站策略两个坑（2026-10-28 机房实测）**：
+  1. **DNS 解析**：数据中心常拦公网 DNS（223.5.5.5/119.29.29.29）与网关 DNS。
+     症状：`ping 域名` 报 name resolution，而 IP 层通。**后果：平台上报全断**
+     （上报走 HTTPS，需解析 neowatt.cn），设备看起来像掉线。
+     排查：`nslookup neowatt.cn <网关>` / `<数据中心内网DNS>`；修复
+     `nmcli con mod jifang ipv4.dns "<内网DNS> ..."`；
+     兜底 `/etc/hosts` 写 `47.237.111.211 neowatt.cn`。
+  2. **出站 UDP**：mesh（WireGuard）是 IP 直连不依赖 DNS，但需出站 UDP 51820/443；
+     被拦则远程通道断（设备可能仍在正常上报）。应急：手机开同名热点让 wlan0 承载 mesh；
+     长期：找数据中心放行 UDP 51820，或改走 wstunnel（TCP 443 伪装）。
+     判定顺序：先看平台是否仍在上报 → 在则设备活着、只是远程通道断。
 - 硬件看门狗已就位（挂死 1 分钟自愈），机房无人值守场景可依赖
