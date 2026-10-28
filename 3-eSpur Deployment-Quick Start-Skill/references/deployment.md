@@ -145,9 +145,14 @@ time snmpwalk -v1 -c public 192.168.0.163 .1.3.6.1.4.1.23273
 [机房交换机] —网线—→ [Pi USB 转接网口: 10.123.4.246/22，网关 10.123.7.254]  上联面（上报+mesh+远程）
 ```
 
-- USB 转接网口为原型机自带（无需额外硬件）。**jifang 连接已预配置**（2026-10-25）：
-  `nmcli con show jifang` 应为 manual 10.123.4.246/22 + 网关 10.123.7.254 + autoconnect，
-  **ifname 绑定通配 `enx*`**——任意 USB 转接网卡插入即被接管，无需预知接口名，不抢 eth0/wlan0
+- USB 转接网口为原型机自带（无需额外硬件）。**jifang 连接已预配置**（2026-10-25 修正）：
+  manual 10.123.4.246/22 + 网关 10.123.7.254 + autoconnect。**绑定必须用实际接口名 + MAC 双保险**
+  （`ifname eth1` + `802-3-ethernet.mac-address 00:e0:4f:3b:a6:30`）：
+  - ⚠ **接口名不一定是 `enx*`**——真实名取决于驱动（RTL8152 在本机是 `eth1`，非 predictable-name 的
+    enx<MAC>）；`nmcli con mod` 改 glob 绑定会**静默失效**（读回仍是旧值），必须删除重建。
+  - MAC 绑定与接口名无关，换 USB 口也不失效。
+  - 现场判断：接口出现但 `NO-CARRIER` = 物理链路未建立（网线没插进转接器 RJ45 口 / 交换机端口
+    不通），配置再对也没用——先解决物理层。
 - 受限 sudo 免密已配置（/etc/sudoers.d/espur-ops，用户 espur-5090）：
   nmcli 全部 + `systemctl restart/status espur-algorithm` + `systemctl restart wg-quick@wg0`——
   远程运维（hub 经 mesh SSH）可完成网络配置与算法/隧道重启，其余仍需密码
