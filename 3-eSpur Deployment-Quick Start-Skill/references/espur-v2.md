@@ -22,17 +22,24 @@ sudo systemctl restart espur-algorithm
 
 参数铁律：`--publish-db`（漏了=不上报）、`--duration 0`（0=无限）、`python3 -u`（无缓冲日志）。
 
-## 代码同步（codeload tarball 通道）
+## 代码同步（真源 = wattos 分支；codeload/scp 双通道）
 
-github.com 主站常不可达；api.github.com + codeload.github.com 可用：
+**部署真源是 `Polar-Zhang/eSpur` 的 `wattos` 分支**（2026-10-28 实测：Pi 部署文件与 hub
+wattos 工作树逐字节一致；`main` 分支停在旧版、缺模式闸门代码，**绝不能从 main 拉**）。
+同步优先 hub 直推（SSH 走 mesh，最简单可靠）：
 
 ```bash
+# hub → Pi 直接 scp（最常用）：
+scp -i ~/.ssh/espur_hub_ed25519 <改动文件> \
+  espur-5090@10.66.66.101:~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/src/同路径
+# codeload tarball 通道（备用；分支必须是 wattos）：
 curl -sL -H "Authorization: Bearer <token>" -o /tmp/eSpur.tgz \
-  https://codeload.github.com/Polar-Zhang/eSpur/tar.gz/refs/heads/main
-tar xzf /tmp/eSpur.tgz eSpur-main/eSpur_v2/src/run_algorithm.py   # 按需提取
-cp <提取文件> ~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/src/同路径
-sudo systemctl restart espur-algorithm
+  https://codeload.github.com/Polar-Zhang/eSpur/tar.gz/refs/heads/wattos
 ```
+
+部署铁律：先备份（`cp -p` 带日期后缀）→ md5 双端比对 → Pi 上 `python3 -m py_compile` →
+确认 `SWITCH_DISABLED` 等现场标记未动 → 才 `sudo systemctl restart espur-algorithm`；
+hub 全程盯 `wg show hub` 确认握手/传输不受影响。
 
 铁律：
 1. `config/config.ini` 绝不覆盖（含 bootstrap 写入的 api_key；上游模板键集合与部署版一致，若上游加键需手工合并）。
@@ -107,7 +114,10 @@ lab-01 已设 2026-12-31 到期）、回复邮件通知、社区回复时区/归
 - `duckdb_ssl_path` 非空且文件不存在 → 所有上报抛 OSError 且只打 warning（248a76d 修复的隐蔽坑）。
 - 平台存储口径：power 与 cur_save_ratio 均 ×100 整数；平台前端负责还原——自写脚本读平台 API 记得除回来。
 - 未优化时节能率上报 0（平台显示 --），见 dd1dcff；日志 save_ratio 是内部估计值，仅供算法内部使用。
-- ⚠ **已知未修（2026-10-28 确认）**：全量历史表 flush 的节能率**没有**做 `decision_count > 0` 门控——
-  首次 PSU 切换前落表的是内部估计值（本机 ≈0.0133），导致平台**历史功率卡片显示 1.3% 假节能率**
-  （实时口径正常、恒 0）。修复方向二选一：客户端 flush 前同样门控（与 dd1dcff 对齐），或平台历史
-  序列接口按决策计数过滤。同步代码后此差异仍在，勿当成同步引入的回归。
+- **历史/统计卡 1.3% 假节能率（2026-10-28 已修，wattos `7d170e9`）**：根因不是落表口径
+  （实时与批量 flush 同源同门控，库里无非零脏值），而是**最差能耗基线累加**（run_algorithm.py
+  两个循环的 `worst_psu_config_energy`）直接消费未门控的内部估计值（活跃 PSU 数 < 满配时被
+  `x*1.5+0.01334` 垫到 ≈1.33%），统计卡 save_ratio=(worst−optimal)/worst 因此固化 ~1.3%，
+  **重启算法才清零**（累计口径）。修复 = 两个循环的累加与上报口径一致（`decision_count>0 且
+  live_mode` 才计入估计值）。自检：`grep -c "decision_count > 0 and live_mode" src/run_algorithm.py`
+  ≥2；Pi 侧备份 `src/run_algorithm.py.bak-20261028`。
