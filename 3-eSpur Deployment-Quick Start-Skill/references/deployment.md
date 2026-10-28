@@ -170,6 +170,10 @@ time snmpwalk -v1 -c public 192.168.0.163 .1.3.6.1.4.1.23273
      （上报走 HTTPS，需解析 neowatt.cn），设备看起来像掉线。
      排查：`nslookup neowatt.cn <网关>` / `<数据中心内网DNS>`；修复
      `nmcli con mod jifang ipv4.dns "<内网DNS> ..."`；
+     兜底（所有 DNS 都不通时，hosts 写死平台 IP——上报只需解析这一个域名）：
+     `echo "47.237.111.211 neowatt.cn" | sudo tee -a /etc/hosts` →
+     `getent hosts neowatt.cn` 确认 → `sudo systemctl restart espur-algorithm`。
+     （2026-10-28 实测：机房禁公网 DNS，hosts 兜底后上报立即恢复）
      兜底 `/etc/hosts` 写 `47.237.111.211 neowatt.cn`。
   2. **出站 UDP**：mesh（WireGuard）是 IP 直连不依赖 DNS，但需出站 UDP 51820/443；
      被拦则远程通道断（设备可能仍在正常上报）。应急：手机开同名热点让 wlan0 承载 mesh；
