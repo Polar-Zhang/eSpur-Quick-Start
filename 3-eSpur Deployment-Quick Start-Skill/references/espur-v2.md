@@ -95,7 +95,12 @@ token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写�
 | 节能率未优化时报 0 | `dd1dcff` | `grep -c "decision_count > 0" src/run_algorithm.py` ≥1 |
 | 实时观测缓冲封顶（树莓派内存） | `9bd948c` | `grep -c "realtime_power_cache_max" src/data/duckdb_client.py` ≥1 |
 | 测试模式节能率报 0 | `7d80207` | `grep -c "_SWITCH_GATE" src/run_algorithm.py` ≥3 |
+| 节能率 test 模式报 0（闸门联动） | `7d80207` | `grep -c "_SWITCH_GATE" src/run_algorithm.py` ≥3 |
 | 上报证书回落 | `248a76d` | config.ini 的 `duckdb_ssl_path` 留空即可 |
+
+另有平台侧配套：账号有效期（expires_at，超管可设倒计时；test 模式下设备工牌
+lab-01 已设 2026-12-31 到期）、回复邮件通知、社区回复时区/归属修复——均为
+平台/管理端改动，与实机客户端同步无关。
 
 ## 已知坑与口径
 
