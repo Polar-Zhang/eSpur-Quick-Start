@@ -85,6 +85,7 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 
 | 症状 | 原因与处理 |
 |---|---|
+| 脚本一启动就报 `join_mesh.sh: line N: SUDO: unbound variable` | 旧版脚本 bug（2026-10-28 实锤）：`set -u` 下 `$SUDO` 未初始化。现行版已修（引用前 `SUDO=""`）。**执行前先 `grep -n 'SUDO=""' join_mesh.sh` 校验**——修复曾被并发提交覆盖过，别信"推过了" |
 | enroll 报 token expired/already used | token 一次性（24 小时有效）。让管理员重新 `issue` |
 | enroll 成功但报 `/etc/wireguard/wg0.conf: Permission denied` | 旧版脚本 bug（已修）：token 模式漏建 `/etc/wireguard` 目录，**且 token 已被消耗**。重新 issue 后用修复版脚本重跑 |
 | 无 handshake，但 `ping 47.237.111.211` 通 | 先按 troubleshooting.md §0.5 判别丢包位置：STUN 通 + hub 全端口 timeout = **hub 阿里云安全组没放行 UDP**（实测最常见根因；控制台加 51820/udp + 443/udp，放行后等看门狗重试，不通则重新 enroll）；STUN 也不通才是本地网络拦 UDP，看门狗会自动切 443 |
@@ -103,5 +104,6 @@ sudo python3 mesh-admin.py revoke lab-02   # 吊销（双端口同步生效）
 - lab-01 = 本机（eSpur-5090，Raspberry Pi 4B / Raspberry Pi OS Lite trixie，wlan0 上外网、eth0 = 192.168.0.200/24）：已 enroll 为 10.66.66.101，wg-quick + 看门狗 enabled，网关职责（ip_forward + eth0 masquerade）在位，`ping -I 10.66.66.101 192.168.0.163` 验证过终端→实机→PDU 全路径。重入 = 管理员同名 `issue` + 本机重新 `--enroll`（mesh IP 不变、密钥轮换）。
 - **开机快速自愈已加（2026-10-22）**：`wg0-bounce-onboot.service`（enabled）——开机 30 秒后检查 wg0 握手记录（`/usr/local/bin/wg0-handshake-check.sh`），从未握手即 bounce 接口。背景实测：wg-quick 开机正常拉起但首次握手偶发失败且 wg 不自动重试，远程通路因此中断 5 分钟（等看门狗周期兜底）；此服务把恢复窗口压到 ~1 分钟。重启预期不可达窗口按 ~1.5 分钟算。
 - `192.168.0.0/24` 已注册给 lab-01；新 lab 机器带**新**子网时在 issue 时声明，服务会做冲突检查。
-- 首次接入踩过三个坑（细节见 troubleshooting.md）：① 旧版脚本 token 模式漏建 `/etc/wireguard` 目录，注册成功却写不了配置，白耗一个 token（已修）② Debian 13/RPi OS 无 iptables 时 NAT 静默失效（已修，脚本自动补装）③ 无 handshake 的真因是阿里云安全组漏放行 UDP，不是校园网——本校园网实测放行任意出站 UDP（判别法 §0.5）。
+- 首次接入踩过三个坑（细节见 troubleshooting.md）：① 旧版脚本 token 模式漏建 `/etc/wireguard` 目录，注册成功却写不了配置，白耗一个 token（已修）② Debian 13/RPi OS 无 iptables 时 NAT 静默失效（已修，脚本自动补装）③ 无 handshake 的真因是阿里云安全组漏放行 UDP，不是校园网——本校园网实测放行任意出站 UDP（判别法 §0.5）。④ 机房部署首跑（2026-10-28）又实锤两个：旧版脚本 `SUDO: unbound variable` 崩在第一步，且修复推送后被并发提交覆盖、现场拉到的仍是坏脚本——**现场执行前必须 grep 校验脚本含修复点**（§0.6）。
+- **机房形态（2026-10-28 起为当前形态）**：lab-01 上联改走机房交换机（USB 转接网卡，业务 IP 10.123.4.246/22 网关 10.123.7.254，预配置见 skill 5），wlan0 不再承载外网。机房网络实测**不拦出站 UDP**：51820/443 双通道 handshake 正常；hub 侧该 peer 的 AllowedIPs 已含机房 PDU 网段 `192.168.0.0/24, 192.168.1.0/24`。机房**禁公网 DNS**——enroll/上报要解析 neowatt.cn 时用 hosts 兜底（`47.237.111.211 neowatt.cn`，详见 skill 3 deployment.md 机房部署变体）。上联未插好时症状同样是"双端口 tx-only 零收包"，先查 Carrier 再怀疑网络策略。
 - 接入脚本需 root：先 `sudo -n true` 验证，不行让用户终端 `sudo -v` 或补 `/etc/sudoers.d/` NOPASSWD（该机重装系统后免密配置丢过一次）。

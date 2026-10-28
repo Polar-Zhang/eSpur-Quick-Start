@@ -62,7 +62,22 @@ EOF
 
 注：NTP（`ntp.aliyun.com:123`）可替代 STUN 做测试①，但只能证明"特定端口对特定目的地"放行；STUN 证明的是任意目的地，两者结合判读更稳。
 
-## 1. 无 handshake，但 ping 47.237.111.211 通
+**机房场景补充（2026-10-28 实测）**：
+- 机房上联（业务 IP 10.123.4.246/22 经交换机）出站 UDP **实测 51820/443 双端口都通**——机房网络不拦 WireGuard，此前的"双端口 tx-only 零收包"发生在上联未就绪时（USB 网卡 NO-CARRIER / 交换机口未通 / 业务 IP 未激活），先看 `ip link` 的 Carrier 再怀疑网络策略（物理层判断见 skill 3 deployment.md 机房部署变体）。
+- 机房**禁公网 DNS** 只影响 enroll（要解析 neowatt.cn），不影响隧道本身（Endpoint 是 IP 直连）。DNS 兜底见 skill 3 deployment.md（hosts 写死 47.237.111.211）。
+
+### 0.6 脚本一启动就崩：`join_mesh.sh: line 38: SUDO: unbound variable`
+
+原因：脚本 `set -u`（未定义变量即报错）下引用了未初始化的 `$SUDO`。**这是旧版脚本的 bug，2026-10-28 机房部署首跑实锤**；现行版已在引用前初始化：
+
+```bash
+grep -n 'SUDO=""' scripts/join_mesh.sh | head -3
+# 修好的脚本第 23-24 行是：
+#   # root 下 SUDO 置空（直接执行），非 root 用 sudo；set -u 下必须先初始化
+#   SUDO=""
+```
+
+⚠ **拿到脚本先 grep 校验再执行，别信"修过了"**：2026-10-28 修复推送后曾被一次并发提交覆盖，现场拉到的仍是坏脚本、白跑一次报错。教训两条：①推送方 `git pull --rebase` 后再推；②现场执行方始终以 grep 到 `SUDO=""` 为准。
 
 公网可达、隧道不通 = 中间某处丢弃了 UDP。先用 §0.5 两步法定位丢包位置（实测首日根因是 hub 阿里云安全组漏放行，而非校园网），再按位置处理：
 

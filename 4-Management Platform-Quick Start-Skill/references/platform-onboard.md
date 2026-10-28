@@ -80,6 +80,7 @@ python3 run.py --entry algorithm --mode real \
 
 | 症状 | 处理 |
 |---|---|
+| 历史功率卡片节能率恒 ≈1.3%，实时却是 0/-- | **已知未修（2026-10-28）**：历史表落表的是客户端内部估计值（未做 `decision_count>0` 门控），实时上报已门控（dd1dcff）。不是数据错误也不是同步回归；修复方向见 skill 3 espur-v2.md 已知坑 |
 | bootstrap HTTP 410 | token 已用/过期。平台重新签发（账号已存在会复用并换 key，无副作用） |
 | bootstrap HTTP 400 | 设备还没有实例，先建实例再签 token |
 | refresh 失败但算法照常跑 | 预期行为（离线鲁棒）。查平台可达性与 api_key 是否被轮换（平台侧 regenerate 会使旧 key 失效，重新 bootstrap 即可） |
