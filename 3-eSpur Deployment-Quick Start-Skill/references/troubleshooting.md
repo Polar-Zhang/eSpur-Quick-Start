@@ -138,5 +138,6 @@ Web 和 SNMP 是两个独立进程，SNMP 正常而 Web 无响应 = Web 守护�
 **已加固（2026-10-22）：**
 - journal 持久化：`/etc/systemd/journald.conf` → `Storage=persistent`，日志落 `/var/log/journal`，重启后可查上次死因（`journalctl -b -1 -n 200`）
 - 硬件看门狗：`/etc/systemd/system.conf` → `RuntimeWatchdogSec=1min`（systemd 喂 `/dev/watchdog`/bcm2835_wdt，整机 hang 1 分钟自动重启，无需现场断电）；重装备后需重新设置
+- 同日 13:24 第二次掉线（实测）：**机房禁公网 DNS → 上报 HTTPS 解析 neowatt.cn 失败 → 平台判离线**。症状区分：设备端 `ping IP` 通而 `ping 域名` 报 name resolution = 纯 DNS 问题（不是掉线）；修复 = hosts 兜底（`47.237.111.211 neowatt.cn` 写入 /etc/hosts 后重启算法）或数据中心放行内网 DNS
 
 遇同类问题：恢复后先 `journalctl -b -1 -n 200` 与 `ls /sys/fs/pstore/` 找死因，再查 `systemctl show -p RuntimeWatchdogUSec`（应非 0）确认看门狗在岗。
