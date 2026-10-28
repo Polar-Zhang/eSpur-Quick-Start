@@ -73,7 +73,16 @@ sudo systemctl enable --now espur-frontend   # next start 127.0.0.1:3000
   systemd 单元 espur-mesh-enroll（127.0.0.1:8443，root 运行）
 - 工具链手册：hub 本机 `/home/zp/espur-mesh/README.md`
 
-## 8. 数据保留策略（迁移 0023 起，每小时巡检自动执行）
+## 8. 账号有效期（迁移 0027，2026-10-25 起）
+
+- `users.expires_at`（NULL = 永不过期）；过期账号登录/刷新 token 均 401
+  「Account expired（账号已过期，请联系管理员延期）」
+- 管理端：用户管理弹窗每行显示到期日 + 剩余天数倒计时（过期红字）；
+  超管点「✎ 设有效期」行内改日期（留空 = 永不过期）
+- API：POST /users/{id}/expires-at（仅超级管理员；body {expires_at}，
+  ISO 8601，null 清除）
+
+## 8b. 数据保留策略（迁移 0023 起，每小时巡检自动执行）
 
 | 数据 | 策略 |
 |---|---|
