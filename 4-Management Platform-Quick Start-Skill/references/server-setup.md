@@ -35,7 +35,7 @@ SMTP_*（qq 邮箱：邀请函/验证码/离线告警）。
 ```bash
 cd /home/zp/eSpur/management-v2/backend
 PYTHONPATH="/home/zp/eSpur/management-v2:/home/zp/eSpur/management-v2/shared/python:/home/zp/eSpur" \
-  /home/zp/.local/envs/espur/bin/alembic upgrade head     # 当前 head: 0022_port_power_time
+  /home/zp/.local/envs/espur/bin/alembic upgrade head     # 以 `alembic heads` 实际输出为准（2026-10-30 时为 0027_user_expires_at，勿照抄）
 sudo systemctl enable --now espur-backend                 # uvicorn 127.0.0.1:8000 --workers 2
 ```
 
@@ -67,6 +67,13 @@ sudo systemctl enable --now espur-frontend   # next start 127.0.0.1:3000
 - espur.conf 内已启用 gzip（HTML/JSON/JS/CSS/SVG，跨境传输降 70-80%）与
   `/espur/_next/static/` 长缓存（immutable）——复建时必须带上，否则页面切换明显变卡
   （2026-10-29 实测：无压缩时跨境拉 JS chunk 是页面"卡一下"的主因）
+- **数据库每日备份**（2026-10-30 起）：`/home/zp/backups/pg-backup.sh`（pg_dump -Fc，
+  完整性自检，保留 14 份），crontab 每日 02:00 → /home/zp/backups/postgres/；
+  复建时需重建该脚本与 cron
+- `management-v2/var/traces/` 目录存 trace 场景 CSV（import-trace 端点写入），
+  复建后需 mkdir；运行遥测保留策略：每实例最近 20 次运行的遥测，其余由每小时
+  巡检自动清理（services/realtime_retention.prune_run_telemetry）
+- 项目待办/已知问题台账：`management-v2/docs/known-issues.md`（含 P0/P1/P2 处理状态）
 
 ## 7. 组网 hub（与平台同机，见 skill 2）
 
