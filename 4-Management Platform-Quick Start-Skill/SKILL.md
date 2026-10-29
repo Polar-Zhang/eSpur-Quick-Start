@@ -77,3 +77,9 @@ curl -s -o /dev/null -w "%{http_code}\n" https://neowatt.cn/espur/instances
 | mesh enroll 404 | nginx 的 `/espur/api/mesh/` location 与 espur-mesh-enroll 服务状态 |
 
 平台操作（登记实机 / Token / 工牌 / 单口曲线）见 `references/platform-onboard.md`。
+
+**UI 改动的强制前置**：前端设计标准在仓库
+`management-v2/frontend/docs/DESIGN_SYSTEM.md`（token 表、标准组件清单、
+新组件 checklist）。日期/下拉/弹窗/表单等同类交互**先复用标准组件**
+（`RangeDatePicker` / `StyledSelect` / `.zc-dialog` 体系 / `.field`），
+基准样例是 `components/RangeDatePicker.tsx`；禁止原生日历/下拉与新造风格。
