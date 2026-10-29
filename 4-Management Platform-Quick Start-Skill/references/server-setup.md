@@ -64,6 +64,9 @@ sudo systemctl enable --now espur-frontend   # next start 127.0.0.1:3000
 - 443：TLS 证书 /etc/letsencrypt/live/neowatt.cn/；`location /espur` → 127.0.0.1:3000；
   `location /espur/api/mesh/` → 127.0.0.1:8443/mesh/
 - 本机防火墙 firewalld：放行 80/tcp、443/tcp、443/udp、51820/udp（后两者为 WG）
+- espur.conf 内已启用 gzip（HTML/JSON/JS/CSS/SVG，跨境传输降 70-80%）与
+  `/espur/_next/static/` 长缓存（immutable）——复建时必须带上，否则页面切换明显变卡
+  （2026-10-29 实测：无压缩时跨境拉 JS chunk 是页面"卡一下"的主因）
 
 ## 7. 组网 hub（与平台同机，见 skill 2）
 
