@@ -68,6 +68,27 @@ python3 run.py --entry algorithm --mode real \
   --psu-count 4 --psu-power 2000 --duration 120
 ```
 
+## 功耗数据导出（2026-10-29 起，仅管理员/超级管理员）
+
+设备详情页 / 历史数据页 →「导出数据」按钮 → 弹窗选时间范围（快捷 1h/24h/7d + 自定义，
+自动预估点数与体积）→ 下载 CSV。member/device 前端无按钮、接口 403。
+
+```bash
+# 预估（点数/端口/大小）
+GET /espur/api/managed-instances/<id>/export?start=...&end=...&preview=1
+# 导出（流式 CSV，UTF-8 BOM，Excel 直开）
+GET /espur/api/managed-instances/<id>/export?start=...&end=...
+```
+
+- 列：`时间, 总功率(W), PSU状态, 在网口数, 口N功率(W)...`；端口列按范围内实际出现过的口生成
+- **时间口径 = 设备本地墙钟（CST、naive）**；带时区入参按绝对时刻换算到 CST
+- 总功率/PSU 流 = `legacy_power_time` ∪ `legacy_realtime_power_time`（有序归并、历史表优先去重）——
+  历史表靠 20 分钟批量 flush，尾部补实时表，任意范围导出连续无缺；单口流 = `legacy_port_power_time`
+- 限制：单次最长 90 天（更早仅剩小时聚合且无 PSU 状态）；流式生成 + 独立 DB 会话，
+  24h（5.6 万行/3.4MB）实测 ~10s、backend 内存零增长
+- 实现位置：后端 `routers/managed_instances.py` 的 export 端点；前端
+  `components/TelemetryExportDialog.tsx`（api.ts 有 blob 下载封装）
+
 ## 平台验收
 
 | 检查项 | 位置 | 预期 |
