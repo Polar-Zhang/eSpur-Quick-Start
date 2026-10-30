@@ -69,7 +69,8 @@ sudo systemctl enable --now espur-frontend   # next start 127.0.0.1:3000
   （2026-10-29 实测：无压缩时跨境拉 JS chunk 是页面"卡一下"的主因）
 - **数据库每日备份**（2026-10-30 起）：`/home/zp/backups/pg-backup.sh`（pg_dump -Fc，
   完整性自检，保留 14 份），crontab 每日 02:00 → /home/zp/backups/postgres/；
-  复建时需重建该脚本与 cron
+  **恢复演练** `pg-restore-drill.sh` 每周日 03:30 自动执行（最新 dump → 临时库恢复 →
+  关键表/账号核对 → 清理）——复建时两个脚本与 cron 都要重建
 - `management-v2/var/traces/` 目录存 trace 场景 CSV（import-trace 端点写入），
   复建后需 mkdir；运行遥测保留策略：每实例最近 20 次运行的遥测，其余由每小时
   巡检自动清理（services/realtime_retention.prune_run_telemetry）
