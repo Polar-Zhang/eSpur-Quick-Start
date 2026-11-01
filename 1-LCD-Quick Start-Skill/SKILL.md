@@ -14,7 +14,7 @@ description: 在树莓派 Raspberry Pi 4 + Raspberry Pi OS Lite (Debian 13 trixi
 | 机型 | Raspberry Pi 4 Model B | 脚本强制检查；Pi 5 不可用（无传统 framebuffer，fbcp 路线不通） |
 | 系统 | Raspberry Pi OS Lite, Debian 13 **trixie**, arm64 | 关键差异都针对 trixie；bullseye/bookworm 部分步骤不同 |
 | 屏幕 | Waveshare 2.4inch LCD Module（ILI9341, 240×320） | 换屏要改 cmake 的 `-DWAVESHARE_*=ON` 目标 |
-| 接线 | DIN→GPIO10, CLK→GPIO11, CS→GPIO8, DC→GPIO25, RST→GPIO27, BL→GPIO24, VCC→3.3V, GND→GND | 源码 `src/board/waveshare_2inch4_lcd.h` 定义 |
+| 接线 | DIN→GPIO10, CLK→GPIO11, CS→GPIO8, DC→GPIO25, RST→GPIO27, BL→GPIO24, VCC→3.3V, GND→GND | 源码 `src/board/waveshare_2inch4_lcd.h` 定义；接线速查见本目录 README.md |
 | 权限 | 免密 sudo（`/etc/sudoers.d/` 已配置） | setup.sh 必须以 root 运行 |
 
 不满足时不要硬跑：先向用户说明差异，经确认后用 `sudo FORCE=1 bash setup.sh` 强制。
@@ -24,6 +24,7 @@ description: 在树莓派 Raspberry Pi 4 + Raspberry Pi OS Lite (Debian 13 trixi
 ```
 waveshare-lcd-setup/
 ├── SKILL.md                 # 本文件
+├── README.md                # 接线快速参考（对应表 + 引脚位置图）
 ├── scripts/setup.sh         # 一键配置脚本（幂等，可重复运行）
 └── assets/
     ├── libraspberrypi0_*.deb        # bcm_host 运行库（bookworm 官方存档包）
