@@ -3,6 +3,7 @@
 ## 部署形态
 
 - 位置：`~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/`（run.py + src/ + scripts/ + config/）
+- 2026-11-03 起第二台实机 **Studio**（user espur-studio，mesh 10.66.66.102）按同构布局部署，平台 external_id=**2**、账号 studio@espur.local，实时上报中（test 模式）
 - 代码上游：私有仓 `Polar-Zhang/eSpur`（v2 全量）；skill 仓 `Polar-Zhang/eSpur-Quick-Start`（本 skill 的发布副本在 `3-eSpur Deployment-Quick Start-Skill/`）
 - 进程：`espur-algorithm.service`（systemd，enabled + Restart=always + RestartSec=10），stdout 追加到 `algorithm_stdout.log`
 - 防冻结：`espur-alg-watchdog.timer` 每 5 分钟检查日志 mtime，>900s 无输出自动重启服务
@@ -22,6 +23,32 @@ sudo systemctl restart espur-algorithm
 
 参数铁律：`--publish-db`（漏了=不上报）、`--duration 0`（0=无限）、`python3 -u`（无缓冲日志）。
 
+## systemd 单元全文（新机照抄，2026-11-03 Studio 验证）
+
+`/etc/systemd/system/espur-algorithm.service`（User/WorkingDirectory 按机替换）：
+
+    [Unit]
+    Description=eSpur_v2 algorithm (real mode, PDU 192.168.0.163 + neowatt reporting)
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    Type=simple
+    User=espur-studio
+    WorkingDirectory=/home/espur-studio/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2
+    ExecStartPre=-/usr/bin/python3 -I scripts/bootstrap_config.py --refresh --config config/config.ini
+    ExecStart=/bin/sh -c 'exec /usr/bin/python3 -u run.py --entry algorithm --mode real --pdu-ip 192.168.0.163 --community-public public --community-private private --psu-count 4 --psu-power 2000 --duration 0 --publish-db >> algorithm_stdout.log 2>&1'
+    Restart=always
+    RestartSec=10
+
+    [Install]
+    WantedBy=multi-user.target
+
+防冻结看门狗三件套：`/usr/local/bin/espur-alg-watchdog.sh`（服务 active 且日志 mtime >900s
+则 restart，`logger -t espur-alg-watchdog` 留痕）+ `espur-alg-watchdog.service`（Type=oneshot，
+ExecStart=上述脚本）+ `espur-alg-watchdog.timer`（OnBootSec=10min，OnUnitActiveSec=5min）。
+全部 `systemctl enable --now`。
+
 ## 代码同步（真源 = wattos 分支；codeload/scp 双通道）
 
 **部署真源是 `Polar-Zhang/eSpur` 的 `wattos` 分支**（2026-10-28 实测：Pi 部署文件与 hub
@@ -36,6 +63,11 @@ scp -i ~/.ssh/espur_hub_ed25519 <改动文件> \
 curl -sL -H "Authorization: Bearer <token>" -o /tmp/eSpur.tgz \
   https://codeload.github.com/Polar-Zhang/eSpur/tar.gz/refs/heads/wattos
 ```
+
+通道 C（2026-11-03 新增）：codeload 从实验室网络实测极慢（120s 超时），可走 Git Trees API +
+raw 逐文件同步——`GET /repos/Polar-Zhang/eSpur/git/trees/wattos?recursive=1` 过滤 `eSpur_v2/`
+前缀，再对每个 path 请求 `raw.githubusercontent.com/Polar-Zhang/eSpur/wattos/<path>`
+（28 文件 284KB 实测秒级；下载后 `python3 -I -m compileall` 全量编译自检）。
 
 部署铁律：先备份（`cp -p` 带日期后缀）→ md5 双端比对 → Pi 上 `python3 -m py_compile` →
 确认 `SWITCH_DISABLED` 等现场标记未动 → 才 `sudo systemctl restart espur-algorithm`；
@@ -55,6 +87,10 @@ python3 eSpur_v2/scripts/bootstrap_config.py --token dboot-xxx --config config/c
 ```
 
 token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写云平台字段，算法参数不碰；config.ini 含 api_key 不得提交/外传。
+
+⚠ **上游 bug（wattos 待修，2026-11-03 Studio 实锤）**：bootstrap_config.py 的 CLOUD_KEYS 白名单漏了 `instance_id`，bootstrap/refresh 都**静默不写**实例号——每次 bootstrap 后必须核对 config.ini 的 instance_id 与平台返回一致（Studio=2 已手工修正）。另外模板的 `espur_deployment_abs_path` 是 macOS 路径（/Users/polar/...），它是数据/日志/matrix 目录的根（constant.py → ensure_deployment_directories），新机必须改成本机部署根。
+
+**mine 接口状态语义**（排障利器）：HTTP 401 `Invalid credentials` = api_key 错；HTTP 404 `No instances granted` = key 有效但账号的实例授权被移除——对应平台 UI 的"未激活"。修复 = 管理员重签 token 重新 bootstrap（自动复用账号+重新授权）+ 重启算法；调试期间勿手动改账号授权，会和 bootstrap 打架。
 
 ## 验证清单
 
