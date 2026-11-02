@@ -107,6 +107,7 @@ GET /espur/api/managed-instances/<id>/export?start=...&end=...
 | refresh 失败但算法照常跑 | 预期行为（离线鲁棒）。查平台可达性与 api_key 是否被轮换（平台侧 regenerate 会使旧 key 失效，重新 bootstrap 即可） |
 | 平台看到上报 401/403 | api_key 不对（被轮换）或账号未授权该实例。重新 bootstrap 会自动修正（复用账号+重新授权） |
 | config.ini 改不进去 | 确认用的 `--config` 路径正确；脚本自动定位失败时显式传 `--config /path/to/config.ini` |
+| 设备卡片"未激活"，实机日志却无上报失败 | 账号-实例授权链断了（2026-11-03 Studio 实锤）。验证：GET device-bootstrap/mine——401 `Invalid credentials`=key 错；404 `No instances granted`=key 有效但授权被移除。修复：重签 token → 实机重新 bootstrap（复用账号+自动重新授权）→ 重启算法。调试期间勿手动改账号授权，会和 bootstrap 打架 |
 
 ## API 速查（平台侧）
 
