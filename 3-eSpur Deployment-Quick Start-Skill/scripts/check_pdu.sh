@@ -25,21 +25,21 @@ else
     fail=1
 fi
 
-echo "== 2. ARP =="
-if ip neigh | grep -q "$PDU.*lladdr"; then
-    echo "   OK: $(ip neigh | grep "$PDU" | head -1)"
-else
-    echo "   !! 无 ARP 表项（链路或对端问题）"
-    fail=1
-fi
-
-sleep 1
-echo "== 3. SNMP sysDescr =="
+echo "== 2. SNMP sysDescr =="
 out=$(snmpget -v1 -c public -t 5 -r 1 "$PDU" .1.3.6.1.2.1.1.1.0 2>&1)
 if echo "$out" | grep -q 'switched-pdu'; then
     echo "   OK: $out"
 else
     echo "   !! $out"
+    fail=1
+fi
+
+sleep 1
+echo "== 3. ARP（放在 SNMP 之后：新机 ARP 表为空时先查必报假失败，2026-11-03）=="
+if ip neigh | grep -q "$PDU.*lladdr"; then
+    echo "   OK: $(ip neigh | grep "$PDU" | head -1)"
+else
+    echo "   !! 无 ARP 表项（链路或对端问题）"
     fail=1
 fi
 
