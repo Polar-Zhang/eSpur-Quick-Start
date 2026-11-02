@@ -20,7 +20,7 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 - v1 链（eSpur 主程序 + MySQL 云端 120.76.119.71）已废弃不再上报，但部署脚本（update_config 的实例布局约定）仍在用。
 - 组网与平台接入不属于本 skill：见 `2-Overlay NetWork-Quick Start-Skill`（完整链路：skill 2 组网 → 本 skill 部署 → skill 4 平台）。
 
-## 生死攸关的事实（七条）
+## 生死攸关的事实（八条）
 
 0. **只有正式模式（live）才开启端口切换能力——测试模式绝不启动算法的切换。** coarse 模式（本机默认）按「服务器 PSU 冗余」逻辑工作：总负载远小于单 PSU 额定（2000W）时会**关掉多余端口只留 1 个**。PDU 上接屏幕/充电器等非服务器测试负载时（2026-10-22 实际发生：两台测试负载被切断电），算法必须处于测试模式（`SWITCH_DISABLED` 闸门落下，见日常运维的 espur-switch.sh）。切换一律用 `espur-switch.sh`：`test` = 闸门落下（切换能力关闭，遥测/上报照常）；`live` = 闸门开启（切换能力开启），**仅当 PDU 接的是真实服务器 PSU、可接受端口被自动管理时才执行**。
 
@@ -30,6 +30,7 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 4. **v2 启动命令必须带 `--publish-db`（默认 False 不上报！）和 `--duration 0`（0=无限）**，且用 `python3 -u`（无缓冲，否则 stdout 块缓冲导致日志不可见）。
 5. **算法由 systemd 托管（`espur-algorithm.service`），不要手工 kill+nohup**（会出现双进程争抢 SNMP 与重复上报）。操作一律 `sudo systemctl restart/status espur-algorithm`；防冻结看门狗 `espur-alg-watchdog.timer`（日志 >900s 无输出自动重启，实锤冻结场景见 troubleshooting.md）。
 6. **从上游同步 `src/hal/snmp_pdu.py` 后必须重打一处实例级语义**：`total_power = sum(port_powers)`（上游 0d932c0 用设备级 `.2.2.4.0` 全 PDU 合计，单 PDU 多实例时会把其它实例负载计入本实例；文件内有注释标记）。其余 OID/缩放/set 字符串化修复与上游一致。
+7. **新机 bootstrap 后必须人工核对 instance_id（2026-11-03 Studio 实锤的上游 bug）**：bootstrap_config.py 的 CLOUD_KEYS 白名单漏了 `instance_id`，脚本声称写实例号但被静默跳过——实例号≠1 的新机会按模板默认值 1 上报，**数据全部打进实例 1（lab-01）**。每次 bootstrap 后核对 config.ini 的 instance_id 与平台 mine 接口返回一致，不一致手工改（Studio=2 已修；上游 wattos 待修）。同场必改：模板 `espur_deployment_abs_path` 是 macOS 路径（数据/日志/matrix 目录的根），须改成本机部署根；模板内嵌真实个人邮箱/QQ/SMTP 授权码（v1 遗留），勿外传。详见 espur-v2.md。
 
 ## 代码来源
 
