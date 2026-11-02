@@ -14,7 +14,7 @@ description: 在树莓派 Raspberry Pi 4 + Raspberry Pi OS Lite (Debian 13 trixi
 | 机型 | Raspberry Pi 4 Model B | 脚本强制检查；Pi 5 不可用（无传统 framebuffer，fbcp 路线不通） |
 | 系统 | Raspberry Pi OS Lite, Debian 13 **trixie**, arm64 | 关键差异都针对 trixie；bullseye/bookworm 部分步骤不同 |
 | 屏幕 | Waveshare 2.4inch LCD Module（ILI9341, 240×320） | 换屏要改 cmake 的 `-DWAVESHARE_*=ON` 目标 |
-| 接线 | DIN→GPIO10, CLK→GPIO11, CS→GPIO8, DC→GPIO25, RST→GPIO27, BL→GPIO24, VCC→3.3V, GND→GND | 源码 `src/board/waveshare_2inch4_lcd.h` 定义；接线速查见本目录 README.md |
+| 接线 | DIN→物理19, CLK→物理23, CS→物理24, DC→物理22, RST→物理13, **BL→物理12(GPIO18,背光常亮)**, VCC→物理1(3.3V), GND→物理6 | 源码定义 BL=GPIO24(物理18)会随控制台息屏黑屏,实机改接 GPIO18/物理12(2026-11-02 验证);数对法+实际线色+引脚图见 README.md |
 | 权限 | 免密 sudo（`/etc/sudoers.d/` 已配置） | setup.sh 必须以 root 运行 |
 
 不满足时不要硬跑：先向用户说明差异，经确认后用 `sudo FORCE=1 bash setup.sh` 强制。
@@ -88,6 +88,9 @@ waveshare-lcd-setup/
 8. 官方 `shell/waveshare-2inch4` 脚本写死 `/home/pi`、旧路径、rc.local，在本环境必然失败，不要用
 9. 必须注释 `dtoverlay=vc4-kms-v3d`（fbcp 靠传统固件 framebuffer；Pi4 内核 CONFIG_FB_BCM2708=y 已验证）
 10. `display_rotate` 会连 HDMI 一起转，SPI 屏翻转只能用 fbcp 编译选项
+11. **fbcp 运行中严禁用 pinctrl 扫描/改引脚模式**：会把 SPI 三线(GPIO8/10/11)从 ALT0 改成 input 当场断总线黑屏（2026-11-02 实锤）。定位误插 BL 线的下拉扫描只能在 fbcp 装好之前做
+12. 总线断过/花屏后，恢复引脚模式也不一定救回来（ILI9341 状态机被垃圾数据卡死），须 `sudo systemctl restart fbcp` 重跑初始化序列
+13. 本机镜像重启会清掉 `/etc/sudoers.d/` 自定义免密文件（espur-studio 实锤丢过一次）——需要 root 的操作前先 `sudo -n true` 验证，失效就重新授权
 
 ## 卸载/回滚
 
