@@ -62,6 +62,8 @@ sudo chmod 600 /etc/netplan/<该文件>.yaml
 sudo netplan generate && sudo netplan apply
 ```
 
+> 2026-11-03 实测：netplan apply 会让 wlan0 闪断数秒后自动恢复（NM 重挂 profile），远程操作时别慌、别回滚；`/lib/netplan/00-network-manager-all.yaml` 的 "Permissions too open" 告警是镜像自带，无害。
+
 验证（**串行、低速**，不要并发扫描 PDU）：
 
 ```bash
