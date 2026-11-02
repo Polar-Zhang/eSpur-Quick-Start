@@ -33,7 +33,9 @@ eSpur 项目的全套部署/运维 skill：从一台全新的树莓派到云平�
 - `Polar-Zhang/eSpur` — 主程序（v2 客户端 + 管理端前后端）
 - 设备身份（工牌）、组网 Token 由管理端签发；**任何密钥/Token 不入库**
 
-## 实机现状（2026-10-22）
+## 实机现状（2026-11-03）
 
-lab-01（Raspberry Pi 4B / trixie）已完成全链路：LCD → 组网 → v2 部署 → 平台在线，
-单口功率曲线实时上报中。
+- **Studio**（Raspberry Pi 4B / trixie，user espur-studio）：全链路上线——LCD（背光物理12
+  常亮方案）→ 组网 **10.66.66.102** → v2 部署（平台 external_id=**2**，studio@espur.local）
+  → 实时上报中（test 模式，PDU 3 号口 ~57W）。systemd：espur-algorithm + 防冻结看门狗。
+- lab-01（Raspberry Pi 4B / trixie）：2026-10-22 曾全链路打通（LCD → 组网 .101 → v2 → 平台在线）。
