@@ -78,6 +78,12 @@ hub 全程盯 `wg show hub` 确认握手/传输不受影响。
 2. `src/hal/snmp_pdu.py` 覆盖后重打实例级 total_power 语义：`total_power = sum(port_powers)`（文件内有注释标记；上游 0d932c0 的其余修复——OID/缩放/set 字符串化——与本地一致）。
 3. 同步后跑一次直读验证：`cd eSpur_v2/src && python3 -c "import sys; sys.path.insert(0,'.'); from hal.snmp_pdu import SNMPPDU; print(SNMPPDU().get_power_data().total_power)"`（有负载应 >0）。
 4. `src/psu.py` 覆盖后重打 `SWITCH_DISABLED` 闸门（set_psu 开头，模式切换语义；上游无此代码）。
+   **自检必须包含 set 路径**：`grep -c "SWITCH_DISABLED" src/psu.py` ≥1——只查 run_algorithm 的
+   `_SWITCH_GATE`（上报口径闸门）**不足以**证明切换被禁（2026-11-03 Studio 实锤：wattos 全新同步
+   缺 set 路径闸门，test 模式下 coarse 决策把口 2/3/4 真实关掉、57W 负载断电；run_algorithm 自检
+   全过掩盖了问题）。闸门补丁形态：set_psu 开头检查 `Path(__file__).resolve().parents[1]/
+   SWITCH_DISABLED` 存在则 warning 后直接 return（本机 src/psu.py 已打，备份 .bak-20261103）。
+   建议上游把闸门正式收编进 wattos。
 
 ## 平台接入（bootstrap，仅首次/凭证轮换时）
 
