@@ -91,6 +91,7 @@ waveshare-lcd-setup/
 11. **fbcp 运行中严禁用 pinctrl 扫描/改引脚模式**：会把 SPI 三线(GPIO8/10/11)从 ALT0 改成 input 当场断总线黑屏（2026-11-02 实锤）。定位误插 BL 线的下拉扫描只能在 fbcp 装好之前做
 12. 总线断过/花屏后，恢复引脚模式也不一定救回来（ILI9341 状态机被垃圾数据卡死），须 `sudo systemctl restart fbcp` 重跑初始化序列
 13. 本机镜像重启会清掉 `/etc/sudoers.d/` 自定义免密文件（espur-studio 实锤丢过一次）——需要 root 的操作前先 `sudo -n true` 验证，失效就重新授权
+14. **控制台空闲 10 分钟会被内核熄屏（blank=4），小屏表现为"亮着但画面冻结"**——fbcp 无故障，是控制台没内容可镜像。诊断：`cat /sys/class/graphics/fb0/blank`（4=熄屏）+ 两次 `md5sum /dev/fb0` 对比（相同=控制台静止）。立即唤醒：`echo 0 | sudo tee /sys/class/graphics/fb0/blank`（setterm 在非 tty 会话下不可靠）；永久：cmdline.txt 追加 `consoleblank=0`，重启生效（2026-11-04 Studio 实锤）
 
 ## 卸载/回滚
 
