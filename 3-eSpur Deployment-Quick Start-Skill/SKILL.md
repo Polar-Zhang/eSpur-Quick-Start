@@ -77,3 +77,12 @@ bash ~/.zcode/skills/espur-deploy/scripts/check_pdu.sh   # PDU 连通性体检�
 - **2026-10-22（当前）**：算法改由 systemd 托管（`espur-algorithm.service` enabled + `espur-alg-watchdog.timer` 防冻结，冻结场景实锤过一次：平台偶发挂起时同步 POST 冻结主循环）。整机重启测试通过：网络/systemd 自启/上报全自动恢复，~1.5 分钟内可达。节能率上报在首次 PSU 切换前恒 0（`decision_count > 0` 判定）；Pi 关机期间数据不产生、实时曲线缺失不补。
 - **2026-10-21**：v2 客户端运行中，平台 external_id=1 在线，单口曲线在线（口 3 实测 62W 屏幕负载）。SNMP OID 修复（`0d932c0`）与单口上报（`3b42ece`）均已在本机代码中。平台：lab-01 / lab-01@espur.local。
 - **2026-10-16（v1 部署期，历史）**：双实例布局（1-2-3-4 / 5-6-7-8）；MySQL 云端（120.76.119.71）部署当天即不可达，现已彻底废弃。手册在 `~/eSpur/eSpur部署完全手册.md`。
+
+
+## 2026-11-12 现状更新（先读这节再用旧文）
+
+- 实例现状：external_id **1 = lab-01**（树莓派，实验站）、**2 = Studio A**（口组 1-4）、
+  **3 = Studio-Backup**（口组 5-8，同 PDU 第二台服务器）。同 PDU 口组模型/部署铁律/
+  手动指令新链路/中转接入 → 全部见 `references/espur-v2.md` 末节（2026-11-12 定案）。
+- 最低代码版本表已扩充（长轮询/差量 SET/盲 PDU 防护/防重放/缓存封顶/bootstrap instance_id）。
+- 本 skill 正文中的 external_id=1、单实例假设等描述按上表对齐后再执行。

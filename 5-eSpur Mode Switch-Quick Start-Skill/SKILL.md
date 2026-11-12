@@ -91,3 +91,26 @@ ping -c 3 neowatt.cn         # 出网
   `3-eSpur Deployment-Quick Start-Skill/SKILL.md`；本 skill 是切换的执行入口
 - 机房网络事实（网段/网关/ACL 未知项）见
   `3-eSpur Deployment-Quick Start-Skill/references/deployment.md` 的机房部署变体
+
+
+## 切 live 前置检查清单（2026-11-12 版，逐项过）
+
+1. **新栈最低版本**：按 skill 3 `references/espur-v2.md` 的最低代码版本表全 grep 通过
+   （盲 PDU 防护/防重放/差量 SET/读回熔断/SET 锁缺任何一项都不要切）。
+2. **线路**：机器到平台出站稳定（遥测连续 ≥30 分钟无断流）。国际受限线路必须已接入
+   国内中转（skill 6），否则优化期间指令/遥测随时中断。
+3. **手动开关端到端验证**：web 上每个口开/关一次，物理动作正常、延迟 ≤5s
+   （差量 SET + 读回熔断已上线；此 PDU 若为"只写不可读"型，读回 WARNING 是预期）。
+4. **≥2 口组语义确认**：该实例 `pdu_ports` 就是这台服务器自己的 PSU 口组（一台服务器
+   一个实例，禁止跨服务器混口组——见 skill 3 espur-v2.md 口组模型节）。
+5. **切换**：`sudo /usr/local/bin/espur-switch.sh live`（test 闸门抬起）。
+   建议同时设手动 hold：`config.ini` 加 `manual_hold_seconds=900`（超管手动指令后 15 分钟
+   内算法不下发，防止优化循环立即覆盖人工操作）。
+6. **观察**：首个决策周期盯日志与 PDU 实际口状态；回滚 = `espur-switch.sh test`（立即）。
+
+### 已知事实（影响 live 的）
+
+- Studio 站 PDU（MAC :80）：控制 OID **只写不可读**（GET 恒超时）→ 继电器读回校准不可用，
+  显示走权威态落盘+电流推断降级链；且曾出现"ACK 但继电器不动作"间歇故障（已缓解，
+  复发时 PDU Web 页验证、必要时恢复出厂）。
+- 手动指令经国内中转（如已接入）延迟亚秒级；读回熔断生效期间每条指令只发差量 SET。

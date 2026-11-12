@@ -12,8 +12,10 @@ eSpur 项目的全套部署/运维 skill：从一台全新的树莓派到云平�
 | 3 | `3-eSpur Deployment-Quick Start-Skill` | eSpur_v2 客户端部署（PDU SNMP + 平台上报） | 设备 |
 | 4 | `4-Management Platform-Quick Start-Skill` | 管理端全栈部署/更新/运维 + 设备接入管理 | 管理端 |
 | 5 | `5-eSpur Mode Switch-Quick Start-Skill` | 测试/生产模式切换 + 上联业务 IP 配置 | 设备 |
+| 6 | `6-Domestic Relay-Quick Start-Skill` | 国内中转节点：受限线路站点桥接接入 | 设备 + 管理端 |
 
-新设备标准流程：**1（接了屏才做）→ 2 组网 → 3 部署 → 4 平台接入**。
+新设备标准流程：**1（接了屏才做）→ 2 组网 → 3 部署 → 4 平台接入**；
+国际受限线路（校园网等）：在 2/3 之间插入 **6 中转接入**。
 不确定从哪开始：直接用 0 号总控，它会先判定你在管理侧还是设备侧。
 
 ## 拓扑
@@ -35,7 +37,18 @@ eSpur 项目的全套部署/运维 skill：从一台全新的树莓派到云平�
 
 ## 实机现状（2026-11-03）
 
+<<<<<<< HEAD
 - **Studio**（Raspberry Pi 4B / trixie，user espur-studio）：全链路上线——LCD（背光物理12
   常亮方案）→ 组网 **10.66.66.102** → v2 部署（平台 external_id=**2**，studio@espur.local）
   → 实时上报中（test 模式，PDU 3 号口 ~57W）。systemd：espur-algorithm + 防冻结看门狗。
 - lab-01（Raspberry Pi 4B / trixie）：2026-10-22 曾全链路打通（LCD → 组网 .101 → v2 → 平台在线）。
+=======
+lab-01（Raspberry Pi 4B / trixie）已完成全链路：LCD → 组网 → v2 部署 → 平台在线，
+单口功率曲线实时上报中。
+
+## 6-Domestic Relay-Quick Start-Skill
+
+国内中转节点（8.148.245.206）：校园网/受限线路站点的平台通道桥接。
+场景判定、机器侧两条命令接入、验证、坑点（安全组 UDP/TCP、CGNAT 漂移、MTU）、
+回滚、新增中转节点从零模板。2026-11-12 新增（lab-01 国际路径事件后定案）。
+>>>>>>> fae1dc2 (docs: 2026-11 relay/onboarding supplements + new skill 6 (domestic relay node))

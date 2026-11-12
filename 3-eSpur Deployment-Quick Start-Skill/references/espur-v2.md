@@ -146,6 +146,14 @@ token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写�
 | 测试模式节能率报 0 | `7d80207` | `grep -c "_SWITCH_GATE" src/run_algorithm.py` ≥3 |
 | 节能率 test 模式报 0（闸门联动） | `7d80207` | `grep -c "_SWITCH_GATE" src/run_algorithm.py` ≥3 |
 | 上报证书回落 | `248a76d` | config.ini 的 `duckdb_ssl_path` 留空即可 |
+| 手动指令长轮询（亚秒级到达） | `fa15aa7` | `grep -c "_manual_poll_loop" src/run_algorithm.py` ≥1 |
+| 差量 SET + SET 锁 + 读回熔断 | `0eea17e` | `grep -c "_SET_LOCK" src/psu.py` ≥1 且 `grep -c "_readback_break" src/run_algorithm.py` ≥1 |
+| 盲 PDU 防护（读数全 0 禁降载） | `14f844e` | `grep -c "power_trusted" src/psu.py` ≥1 |
+| 手动指令防重放（继电器比对） | `14f844e` | `grep -c "防重放" src/run_algorithm.py` ≥1 |
+| 缓存封顶 + batch_size 生效 | `14f844e` | `grep -c "power_time_cache_max" src/data/duckdb_client.py` ≥1 |
+| bootstrap_config 写 instance_id | `73103da` | `grep -c '"instance_id"' scripts/bootstrap_config.py` ≥1 |
+| runner 参数/StartLimit | `14f844e` | `grep -c "StartLimitIntervalSec" agent-v2/systemd/espur-runner@.service` ≥1 |
+| 平台 /mine/wait 长轮询端点 | `fa15aa7` | `grep -rc "mine/wait" management-v2/backend/app/routers/device_bootstrap.py` ≥1 |
 
 另有平台侧配套：账号有效期（expires_at，超管可设倒计时；test 模式下设备工牌
 lab-01 已设 2026-12-31 到期）、回复邮件通知、社区回复时区/归属修复——均为
@@ -163,3 +171,46 @@ lab-01 已设 2026-12-31 到期）、回复邮件通知、社区回复时区/归
   **重启算法才清零**（累计口径）。修复 = 两个循环的累加与上报口径一致（`decision_count>0 且
   live_mode` 才计入估计值）。自检：`grep -c "decision_count > 0 and live_mode" src/run_algorithm.py`
   ≥2；Pi 侧备份 `src/run_algorithm.py.bak-20261028`。
+
+
+## 多实例同 PDU 口组模型 + 中转接入（2026-11-12 定案）
+
+### 一台 8 口 PDU 服务两台服务器（口组语义）
+
+**一个实例 = 一台服务器 = 自己的 PDU 口组**。禁止把两台服务器的口混进一个实例
+（≥2 保护会被另一台服务器的口凑数，等于没有保护）：
+
+| 部署目录 | 平台实例 | external_id | 口组 | 运行位置 |
+|---|---|---|---|---|
+| `192.168.0.163_1-2-3-4/eSpur_v2` | Studio_1-2-3-4（平台 id=8） | 2 | 1-4 | Studio 机器（espur-algorithm.service） |
+| `192.168.0.163_5-6-7-8/eSpur_v2` | Studio-Backup_5-6-7-8（平台 id=9） | 3 | 5-8 | Studio 机器（espur-algorithm-b.service） |
+| `192.168.0.163_1-2-3-4/eSpur_v2` | lab-01（平台 id=5） | 1 | 1-4 | lab 树莓派（espur-algorithm.service） |
+
+新实例部署（B 型）与 A 型的差异只有四处：目录名口组、`pdu_ports_used`、systemd 单元名、
+bootstrap token（平台实例须先建、token 24h 有效）。其余（run.py/SWITCH_DISABLED/闸门/护栏）完全一致。
+
+### 部署铁律（2026-11-12 踩坑全集）
+
+1. **`scripts/bootstrap_config.py` 必须与仓库最新版一致**（rsync 仓库 `eSpur_v2/scripts/`）。
+   旧版缺 instance_id 写入（`73103da`），兑换后静默保持模板值 → **数据错报进别的实例**。
+   自检：`grep -c '"instance_id"' scripts/bootstrap_config.py` ≥1。
+2. 部署目录根**必须有 `run.py` 与 `SWITCH_DISABLED`**（只拷 src/scripts/config 会服务起不来/误开切换）。
+3. bootstrap/refresh 重写后的 config 是**无空格 `=` 格式**（`pdu_ports_used=5-6-7-8`），
+   sed 匹配不要带空格：`sed -i 's/^pdu_ports_used=.*/pdu_ports_used=5-6-7-8/'`。
+4. systemd 单元**每实例一个**（espur-algorithm / espur-algorithm-b …），必带
+   `StartLimitIntervalSec=0`，必带 `ExecStartPre=...bootstrap_config.py --refresh`。
+5. 手动指令链路（2026-11-12 起默认）：设备独立线程长轮询 `/mine/wait`（亚秒级到达）；
+   读回熔断（连续失败停试 10 分钟）；差量 SET（只 SET 状态变化的口）；SET 全程持锁。
+   `psu.py` 的权威态落盘 `.psu_authority.json`（重启不失忆）。
+6. **hub 路由 MTU 钳制**（CGNAT/受限线路上国际 MTU ~1250 时必须）：
+   `sudo ip route replace 47.237.111.211/32 dev eth1 mtu 1200`
+   （lab-01 已装持久化单元 `espur-mtu-clamp.service`）。
+7. **国际路径受限**（校园网/CGNAT：国内通、国际 TCP/UDP 断）→ 平台通道走国内中转，
+   见新 skill `6-Domestic Relay-Quick Start-Skill`（机器侧仅 `/etc/hosts` 一行 + WG endpoint）。
+
+### 现状速览（2026-11-12）
+
+- lab-01：新栈 + 中转 hosts 已配；其上行 CGNAT 线间歇断（恢复即自动补传，缓存 2h）。
+- Studio：A/B 两个算法单元 active，遥测满速；其 PDU（MAC 尾 :80）**控制 OID 只写不可读
+  （GET 恒超时）且曾出现"ACK 但继电器不动作"间歇故障**——已上线差量 SET + 读回熔断缓解，
+  复发时用 PDU Web 页验证该口，必要时恢复出厂/换 PDU。

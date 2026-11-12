@@ -83,3 +83,15 @@ curl -s -o /dev/null -w "%{http_code}\n" https://neowatt.cn/espur/instances
 新组件 checklist）。日期/下拉/弹窗/表单等同类交互**先复用标准组件**
 （`RangeDatePicker` / `StyledSelect` / `.zc-dialog` 体系 / `.field`），
 基准样例是 `components/RangeDatePicker.tsx`；禁止原生日历/下拉与新造风格。
+
+
+## 2026-11-12 增补
+
+- **平台拓扑新组件：国内中转节点** `8.148.245.206`（广州轻量，nginx stream 透明转发
+  TCP 443/8443→hub:443、UDP 51821→hub:51820）。国际受限站点（校园网等）经它接入，
+  平台零改动。维护/接入/坑点 → 新 skill `6-Domestic Relay-Quick Start-Skill`。
+- **DB 会话时区已钉 UTC**（`app/database.py` connect options；提交 `b9f7762`）：
+  库内时间戳列统一 naive UTC，排查时用 `(now() AT TIME ZONE 'UTC')` 口径，勿用本地 now()。
+- **实例=一台服务器=自己的 PDU 口组**：共用 8 口 PDU 的两台服务器各建各的实例
+  （A `pdu_ports=1-2-3-4`、B `5-6-7-8`），禁止混实例（≥2 保护语义，详见 skill 3 增补）。
+- **bootstrap token 有效期 24h**（早期文档写 15 分钟，以 `TOKEN_TTL` 为准）。
