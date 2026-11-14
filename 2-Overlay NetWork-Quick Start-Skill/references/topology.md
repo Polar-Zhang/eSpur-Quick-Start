@@ -64,20 +64,21 @@
              出口103.189.154.10  出口120.235.19.241  （未连接）（未连接）
 ```
 
-## 四、数据上报链路（**TCP 443 HTTPS**；UDP 只存在于 WG 管理面）
+## 四、数据上报链路（**TCP 443 HTTPS**；不走 WG 管理面）
 
 ```
 lab-01(ext1) ── HTTPS → 8.134.215.146:443（hosts: 8.134.215.146 neowatt.cn）
                           │ nginx stream 透传 TLS
                           ▼
-                   47.237.111.211:443 → nginx → 后端:8000 → PostgreSQL
+                   47.237.111.211:443 → nginx → 前端:3000 → 后端:8000 → PostgreSQL
                           ▲
 Studio(ext2) ── HTTPS ───┘（DNS 直连主站，不过中转）
 Studio-Backup(ext3) HTTPS（直连主站，不在 mesh）
 gz-terminal ── 浏览器 → neowatt.cn（DNS → 主站）
 
-指令方向：设备每 5s 长轮询 /device/config/mine，平台在响应携带 psu_override
-（设备出站发起，无需入站端口）；PDU SNMP 只在本地局域网，永不出网
+指令方向：设备出站长轮询 /espur/api/device-bootstrap/mine/wait，平台响应携带 psu_override；
+当前工作区客户端最长等待25秒，指令更新可提前返回，实机版本与间隔须核对。
+设备通常通过本站局域网 SNMP 控制 PDU；经 WG 直访 PDU 时也可能有加密隧道内的 SNMP。
 ```
 
 ## 五、机器台账（命名三体系对齐）
@@ -93,8 +94,7 @@ gz-terminal ── 浏览器 → neowatt.cn（DNS → 主站）
 | 广州 | user1 终端 | — | — | — | 10.10.10.3 | 51820 | 自有 hub |
 | — | user2 / user3 终端 | — | — | — | 10.10.10.4/5 | 51820 | 未连接 |
 
-管理 SSH：`ssh -i ~/.ssh/espur_hub_ed25519 espur-5090@10.66.66.101`（lab-01 ✓）；
-Studio 公钥未生效（装好前走用户贴命令）。中转：`sshpass` + root@8.134.215.146。
+历史管理连接和密钥安装状态可能变化，应按目标主机当前授权及已验证的主机身份核对，勿依赖历史密钥或未核实的连接方式。
 
 ## 六、端口与协议矩阵
 
@@ -104,6 +104,6 @@ Studio 公钥未生效（装好前走用户贴命令）。中转：`sshpass` + r
 | 51820/udp | WG | 自有 hub（中转） | 用户自有系统 |
 | 443/8443 TCP | TLS | 中转 nginx → 主站:443 | 遥测上报+指令（lab-01） |
 | 443 TCP | TLS | 主站 nginx | 上报（Studio 直连）、Web UI |
-| 8444 TCP | TLS | 中转 nginx → 主站:22 | SSH 应急通道 |
+| 8444 TCP | SSH over TCP | 中转 nginx → 主站:22 | SSH 应急通道 |
 | 8000 / 3000 / 5432 TCP | HTTP/— | 主站 | 后端 / 前端 / PG |
-| 161/udp | SNMP | 各站局域网内 | 实机 → 本站 PDU（永不出网） |
+| 161/udp | SNMP | 各站 PDU | 设备 → 本站 PDU；经 WG 直访时可能封装在隧道内 |

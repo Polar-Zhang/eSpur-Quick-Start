@@ -1,4 +1,8 @@
-# eSpur_v2 与云平台运维（本机实例 lab-01）
+# eSpur_v2 与云平台运维（历史记录与核对要点）
+
+> 2026-11-15 审阅：本文包含历史主机、旧服务和示例，不能视为当前实机已验证配置。
+> 当前网络角色、两套 WG 与实例口组以[全网拓扑](<../../2-Overlay NetWork-Quick Start-Skill/references/topology.md>)及实际只读核对为准。
+> 旧 `espur-switch.sh` 的 status/test/live 都会先启动服务，不得执行；PDU 真实切换和重启需单独确认。
 
 ## 部署形态
 
@@ -7,11 +11,12 @@
 - 代码上游：私有仓 `Polar-Zhang/eSpur`（v2 全量）；skill 仓 `Polar-Zhang/eSpur-Quick-Start`（本 skill 的发布副本在 `3-eSpur Deployment-Quick Start-Skill/`）
 - 进程：`espur-algorithm.service`（systemd，enabled + Restart=always + RestartSec=10），stdout 追加到 `algorithm_stdout.log`
 - 防冻结：`espur-alg-watchdog.timer` 每 5 分钟检查日志 mtime，>900s 无输出自动重启服务
-- 模式切换（闸门方案）：算法服务常驻，`SWITCH_DISABLED` 标记文件控制切换能力，
-  **只有 live 开启端口切换**。切换操作与业务 IP 配置统一见 skill 5
-  （5-eSpur Mode Switch）；闸门代码在 src/psu.py 的 set_psu 开头（上游同步该文件后需重打）
+- 当前工作区 `SWITCH_DISABLED` 只拦 auto；manual 和 safety 不受检查，部分安全调用却未显式传 safety。标记存在不等于禁止所有真实 SET。现有模式脚本暂不可用，见 skill 5；设备实际版本须单独核对。
 
-## 启动 / 重启（唯一正确方式）
+## 启动 / 重启（历史示例，不是自动操作步骤）
+
+> `--duration 0` 是无限运行，`--mode real` 可能控制 PDU。以下命令仅记录旧 unit；
+> 不在运行服务旁手工启动第二实例，实际启停需明确目标实例和现场影响。
 
 ```bash
 sudo systemctl restart espur-algorithm
@@ -23,7 +28,9 @@ sudo systemctl restart espur-algorithm
 
 参数铁律：`--publish-db`（漏了=不上报）、`--duration 0`（0=无限）、`python3 -u`（无缓冲日志）。
 
-## systemd 单元全文（新机照抄，2026-11-03 Studio 验证）
+## systemd 单元历史样例（2026-11-03 Studio；不可直接照抄）
+
+> 路径、unit、代码及凭据机制须按设备核对；该示例不证明当前远端使用此版本。
 
 `/etc/systemd/system/espur-algorithm.service`（User/WorkingDirectory 按机替换）：
 
@@ -47,7 +54,7 @@ sudo systemctl restart espur-algorithm
 防冻结看门狗三件套：`/usr/local/bin/espur-alg-watchdog.sh`（服务 active 且日志 mtime >900s
 则 restart，`logger -t espur-alg-watchdog` 留痕）+ `espur-alg-watchdog.service`（Type=oneshot，
 ExecStart=上述脚本）+ `espur-alg-watchdog.timer`（OnBootSec=10min，OnUnitActiveSec=5min）。
-全部 `systemctl enable --now`。
+上述看门狗属于历史记录；是否启用及其对现场的影响须按目标设备核对。
 
 ## 代码同步（真源 = wattos 分支；codeload/scp 双通道）
 
@@ -69,21 +76,14 @@ raw 逐文件同步——`GET /repos/Polar-Zhang/eSpur/git/trees/wattos?recursiv
 前缀，再对每个 path 请求 `raw.githubusercontent.com/Polar-Zhang/eSpur/wattos/<path>`
 （28 文件 284KB 实测秒级；下载后 `python3 -I -m compileall` 全量编译自检）。
 
-部署铁律：先备份（`cp -p` 带日期后缀）→ md5 双端比对 → Pi 上 `python3 -m py_compile` →
-确认 `SWITCH_DISABLED` 等现场标记未动 → 才 `sudo systemctl restart espur-algorithm`；
-hub 全程盯 `wg show hub` 确认握手/传输不受影响。
+历史部署记录曾按备份、文件比对、编译和核对闸门的顺序更新。当前应先确认目标实例、精确版本、差异、可回滚方式和物理影响；不能把重启作为默认动作。旧新加坡 `hub` 已退役，北京自有 `wg0` 不得更改。
 
 铁律：
 1. `config/config.ini` 绝不覆盖（含 bootstrap 写入的 api_key；上游模板键集合与部署版一致，若上游加键需手工合并）。
-2. `src/hal/snmp_pdu.py` 覆盖后重打实例级 total_power 语义：`total_power = sum(port_powers)`（文件内有注释标记；上游 0d932c0 的其余修复——OID/缩放/set 字符串化——与本地一致）。
-3. 同步后跑一次直读验证：`cd eSpur_v2/src && python3 -c "import sys; sys.path.insert(0,'.'); from hal.snmp_pdu import SNMPPDU; print(SNMPPDU().get_power_data().total_power)"`（有负载应 >0）。
-4. `src/psu.py` 覆盖后重打 `SWITCH_DISABLED` 闸门（set_psu 开头，模式切换语义；上游无此代码）。
-   **自检必须包含 set 路径**：`grep -c "SWITCH_DISABLED" src/psu.py` ≥1——只查 run_algorithm 的
-   `_SWITCH_GATE`（上报口径闸门）**不足以**证明切换被禁（2026-11-03 Studio 实锤：wattos 全新同步
-   缺 set 路径闸门，test 模式下 coarse 决策把口 2/3/4 真实关掉、57W 负载断电；run_algorithm 自检
-   全过掩盖了问题）。闸门补丁形态：set_psu 开头检查 `Path(__file__).resolve().parents[1]/
-   SWITCH_DISABLED` 存在则 warning 后直接 return（本机 src/psu.py 已打，备份 .bak-20261103）。
-   建议上游把闸门正式收编进 wattos。
+2. 当前工作区已包含实例级 `total_power = sum(port_powers)`；实际设备版本需比较。不要机械重打旧补丁或覆盖现场配置。
+3. 实机读取会产生 PDU 负载，先确认站点及所需 OID、串行并限制请求；不要把全树 walk 作为默认验证。
+4. 当前工作区 `src/psu.py` 已含闸门，但仅拦 auto，manual/safety 不受其检查；实际安全调用和设备版本需核对。历史“上游无闸门、必须重打”的说明已过期。仅 grep 到标记也不能证明控制安全。
+
 
 ## 平台接入（bootstrap，仅首次/凭证轮换时）
 
@@ -94,7 +94,7 @@ python3 eSpur_v2/scripts/bootstrap_config.py --token dboot-xxx --config config/c
 
 token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写云平台字段，算法参数不碰；config.ini 含 api_key 不得提交/外传。
 
-⚠ **上游 bug（wattos 待修，2026-11-03 Studio 实锤）**：bootstrap_config.py 的 CLOUD_KEYS 白名单漏了 `instance_id`，bootstrap/refresh 都**静默不写**实例号——每次 bootstrap 后必须核对 config.ini 的 instance_id 与平台返回一致（Studio=2 已手工修正）。另外模板的 `espur_deployment_abs_path` 是 macOS 路径（/Users/polar/...），它是数据/日志/matrix 目录的根（constant.py → ensure_deployment_directories），新机必须改成本机部署根。
+2026-11-03 旧版 bootstrap 曾遗漏 `instance_id`；当前工作区 `CLOUD_KEYS` 已包含该字段，但远端设备版本未核验。核对每实例的 `instance_id`、端口组和部署目录；不要输出或覆盖真实凭据。
 
 **mine 接口状态语义**（排障利器）：HTTP 401 `Invalid credentials` = api_key 错；HTTP 404 `No instances granted` = key 有效但账号的实例授权被移除——对应平台 UI 的"未激活"。修复 = 管理员重签 token 重新 bootstrap（自动复用账号+重新授权）+ 重启算法；调试期间勿手动改账号授权，会和 bootstrap 打架。
 
@@ -102,8 +102,8 @@ token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写�
 
 | 检查 | 命令 | 预期 |
 |---|---|---|
-| 凭证 | `curl "https://neowatt.cn/espur/api/device-bootstrap/mine?email=<email>&api_key=<key>"` | 200，lab-01 / [1] / ssl_path 空 |
-| 上报通道 | `ss -tnp | grep <MainPID> | grep 47.237.111.211:443` | ESTAB，Send-Q 无堆积 |
+| 身份 | 核对当前设备与平台授权关系 | 勿将凭据放入命令行、URL 或日志；当前服务端已兼容请求头，设备须按版本迁移 |
+| 上报通道 | 只读检查连接和目标地址 | lab 经国内中转，Studio 侧按台账直连；PID/连接与实际设备配置核对 |
 | 采样 | `tail algorithm_stdout.log` | COARSE/Warmup 行，power 非 0（有负载时）；失败告警数 0 |
 | 平台曲线 | 管理员看设备卡片 | 实时 + port1-4 小图（数据表 espur_instance_real_time_power_time / espur_port_power_time） |
 
@@ -112,10 +112,10 @@ token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写�
 ## 上报语义（心智模型）
 
 - 实时总功率 + 单口功率（port_powers=power[1]）逐条即发，失败仅中文告警（“发送实时数据失败/出错”“发送单口功率失败/出错”），不缓存不重试 → 进程死亡/断网期间的实时曲线**缺失不补**。
-- 全量功率表 power_time_cache 每 1200s 批量 flush（≤1000 条/批），进程 close() 时再 flush —— 短暂断网后历史表可补，实时曲线不补。
+- 历史缓存有容量上限，实际 flush 间隔和批量阈值按设备配置与版本核对。ping 失败路径会进入未见重放消费的队列；重启、异常退出及长时间断连不保证补齐。
 - 节能率：第一次 PSU 切换决策前上报恒 0（`decision_count > 0` 判定）；日志 save_ratio 是内部估计值。
-- total_power 是**实例级**（本实例 4 口之和），非设备级全 PDU 合计 —— 同步 snmp_pdu.py 后必须保留该语义。
-- duckdb_ssl_path 必须为空：requests verify=falsy 跳过自签证书校验（平台证书链限制）。
+- 当前工作区 total_power 为实例口组之和；部分 OID 失败会低估该值，不能把任一正读数当作全口完整证明。
+- 当前工作区在 `duckdb_ssl_path` 为空或文件不存在时回退系统 CA 校验，不等于关闭 TLS 校验；按设备版本及证书链核对。
 
 
 ## 目录布局
@@ -133,7 +133,9 @@ token 一次性（410 = 已消费/过期，找管理员重签）；脚本只写�
 
 多实例沿用 v1 约定：config.ini 的 `instance_id = 1-2` 由 update_config.py 分发到各实例目录。
 
-## 最低代码版本（缺一则对应功能缺失）
+## 历史版本核对线索（不是当前验收标准）
+
+以下 commit 和 grep 是当时排障线索，不保证当前行为、安全性或远端部署版本；须结合源码、实际进程与隔离测试核对。
 
 | 功能 | 修复 commit | 本机自检 grep |
 |---|---|---|
@@ -161,8 +163,8 @@ lab-01 已设 2026-12-31 到期）、回复邮件通知、社区回复时区/归
 
 ## 已知坑与口径
 
-- `duckdb_ssl_path` 非空且文件不存在 → 所有上报抛 OSError 且只打 warning（248a76d 修复的隐蔽坑）。
-- 平台存储口径：power 与 cur_save_ratio 均 ×100 整数；平台前端负责还原——自写脚本读平台 API 记得除回来。
+- 旧版缺失证书路径可能导致上报异常；当前工作区回退系统 CA，设备版本需核验。
+- 当前工作区客户端存储口径：power 以 W ×100 整数上报；`cur_save_ratio` 为比例值 ×10000（等于百分比 ×100）。具体设备和接口版本需核对。
 - 未优化时节能率上报 0（平台显示 --），见 dd1dcff；日志 save_ratio 是内部估计值，仅供算法内部使用。
 - **历史/统计卡 1.3% 假节能率（2026-10-28 已修，wattos `7d170e9`）**：根因不是落表口径
   （实时与批量 flush 同源同门控，库里无非零脏值），而是**最差能耗基线累加**（run_algorithm.py
@@ -186,10 +188,9 @@ lab-01 已设 2026-12-31 到期）、回复邮件通知、社区回复时区/归
 | `192.168.0.163_5-6-7-8/eSpur_v2` | Studio-Backup_5-6-7-8（平台 id=9） | 3 | 5-8 | Studio 机器（espur-algorithm-b.service） |
 | `192.168.0.163_1-2-3-4/eSpur_v2` | lab-01（平台 id=5） | 1 | 1-4 | lab 树莓派（espur-algorithm.service） |
 
-新实例部署（B 型）与 A 型的差异只有四处：目录名口组、`pdu_ports_used`、systemd 单元名、
-bootstrap token（平台实例须先建、token 24h 有效）。其余（run.py/SWITCH_DISABLED/闸门/护栏）完全一致。
+上表是 2026-11-12 的进程部署记录。B 与 A 至少需区分口组、`pdu_ports_used`、服务及身份；不能据此假设其他配置、代码和闸门均一致。受供电服务器与运行采集控制程序的主机可能不是同一台。
 
-### 部署铁律（2026-11-12 踩坑全集）
+### 2026-11-12 部署记录（历史线索，不能直接执行）
 
 1. **`scripts/bootstrap_config.py` 必须与仓库最新版一致**（rsync 仓库 `eSpur_v2/scripts/`）。
    旧版缺 instance_id 写入（`73103da`），兑换后静默保持模板值 → **数据错报进别的实例**。
@@ -200,26 +201,23 @@ bootstrap token（平台实例须先建、token 24h 有效）。其余（run.py/
 4. systemd 单元**每实例一个**（espur-algorithm / espur-algorithm-b …），必带
    `StartLimitIntervalSec=0`，必带 `ExecStartPre=...bootstrap_config.py --refresh`。
 5. 手动指令链路（2026-11-12 起默认）：设备独立线程长轮询 `/mine/wait`（亚秒级到达）；
-   读回熔断（连续失败停试 10 分钟）；差量 SET（只 SET 状态变化的口）；SET 全程持锁。
+   读回熔断（连续失败停试 10 分钟）；差量 SET。当前代码仅对逐口 SET 持锁，闸门/安全判断及权威态更新在锁外，不能声称全流程原子。
    `psu.py` 的权威态落盘 `.psu_authority.json`（重启不失忆）。
-6. **hub 路由 MTU 钳制**（CGNAT/受限线路上国际 MTU ~1250 时必须）：
-   `sudo ip route replace 47.237.111.211/32 dev eth1 mtu 1200`
-   （lab-01 已装持久化单元 `espur-mtu-clamp.service`）。
+6. **历史 MTU 钳制**：lab-01 曾针对旧国际路径配置主机路由。当前上报使用国内中转；原 `47.237.111.211/32` 钳制是否仍有作用须按现有路由核对，不应自动套用。
 7. **国际路径受限**（校园网/CGNAT：国内通、国际 TCP/UDP 断）→ 平台通道走国内中转，
    见新 skill `6-Domestic Relay-Quick Start-Skill`（机器侧仅 `/etc/hosts` 一行 + WG endpoint）。
 
 ### 现状速览（2026-11-12）
 
-- lab-01：新栈 + 中转 hosts 已配；其上行 CGNAT 线间歇断（恢复即自动补传，缓存 2h）。
+- lab-01：该条为 2026-11-12 的中转部署记录；网络恢复不能保证所有丢失采样自动补传，实际行为取决于失败路径与设备版本。
 - Studio：A/B 两个算法单元 active，遥测满速；其 PDU（MAC 尾 :80）**控制 OID 只写不可读
   （GET 恒超时）且曾出现"ACK 但继电器不动作"间歇故障**——已上线差量 SET + 读回熔断缓解，
-  复发时用 PDU Web 页验证该口，必要时恢复出厂/换 PDU。
+  这是历史记录；恢复出厂或更换 PDU 会影响受供电设备，不能作为自动排障。
 
 
 ## 信息大屏 /dashboard（2026-11-14 上线，测试版）
 
-- 路由：`/espur/dashboard`（主站风格亮色，未替换 /overview）；组件源码：
-  `references/components/`（`MachineRoomIso` 等距 3D 机房 SVG 纯手绘零依赖 + `GaugeRadial` 240° 仪表盘）。
+- 路由：`/espur/dashboard`（主站风格亮色，未替换 /overview）。`references/components/` 是历史参考副本，与主项目当前组件不一致，不能复制覆盖；以目标 release 的 `management-v2/frontend/components/` 和构建产物为准。
 - 布局：KPI 六卡 → 三列（左=PUE/节能率仪表盘，中=3D 机房，右=当前状态行+设备动态）→
   30 天趋势全宽 → 运维链接。
 - 数据：`GET /api/dashboard`（KPI/机房分组/趋势/PUE/节能率/事件一次带齐，10s 轮询）。
@@ -237,5 +235,5 @@ bootstrap token（平台实例须先建、token 24h 有效）。其余（run.py/
   D 状态，负载 76，整机僵死（SSH/数据库全超时），用户被迫整机重启。
 - **防复发三件套**（均已上线）：① 三表 (instance,timestamp) 索引确认存在 ② 历史查询
   statement_timeout 15s ③ 长区间强制走小时表。systemd 资源天花板（MemoryMax/CPUQuota）
-  为最后防线——未来任何漏网查询最多拖慢单个服务，整机不再僵死。
+  是部分防护；数据库、内存与磁盘 I/O 仍共享，不能保证整机永不受影响。
 - 教训：**任何新数据端点必须先在真实数据量下 EXPLAIN 验证**，再上线轮询路径。

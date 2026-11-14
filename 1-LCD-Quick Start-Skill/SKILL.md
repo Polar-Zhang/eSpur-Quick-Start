@@ -17,7 +17,7 @@ description: 在树莓派 Raspberry Pi 4 + Raspberry Pi OS Lite (Debian 13 trixi
 | 接线 | DIN→物理19, CLK→物理23, CS→物理24, DC→物理22, RST→物理13, **BL→物理12(GPIO18,背光常亮)**, VCC→物理1(3.3V), GND→物理6 | 源码定义 BL=GPIO24(物理18)会随控制台息屏黑屏,实机改接 GPIO18/物理12(2026-11-02 验证);数对法+实际线色+引脚图见 README.md |
 | 权限 | 免密 sudo（`/etc/sudoers.d/` 已配置） | setup.sh 必须以 root 运行 |
 
-不满足时不要硬跑：先向用户说明差异，经确认后用 `sudo FORCE=1 bash setup.sh` 强制。
+先核对实际屏幕、接线与环境；`FORCE=1` 只跳过脚本的机型/系统检查，不能证明驱动和接线安全或兼容，不能把强制运行作为默认处理。
 
 ## 目录内容
 

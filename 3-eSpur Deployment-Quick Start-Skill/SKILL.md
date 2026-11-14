@@ -5,7 +5,7 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 
 # eSpur 部署与排障
 
-最后验证：2026-10-22（lab-01 重启自愈测试：systemd 自启 + 上报恢复全通过；进程冻结看门狗上线）。
+设备部署记录包含 2026-10 至 11 月的历史快照，并非实时实机状态。现网角色、实例与两套组网见[拓扑台账](<../2-Overlay NetWork-Quick Start-Skill/references/topology.md>)。实机代码、服务和闸门须逐台只读核对；不要因为文档声称已验证就假定当前一致。
 
 ## 系统结构（先建立心智模型）
 
@@ -16,21 +16,21 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 [WireGuard mesh hub 10.66.66.1] ←—— Pi wg0 出站隧道（人的远程运维，上报不走这里）
 ```
 
-- 当前运行形态是 **eSpur_v2 real 模式**：一个「实例」= PDU 上一组端口 = 平台一个 external_id。本机布局：`192.168.0.163_1-2-3-4`（平台 external_id=1）。
+- 设备侧记录使用 **eSpur_v2 real 模式**：一个实例对应一台受供电服务器及其 PDU 口组和 external_id。lab 为 1，Studio A/B 为 2/3；两站 PDU 地址相同，不可仅凭 IP 判定站点。
 - v1 链（eSpur 主程序 + MySQL 云端 120.76.119.71）已废弃不再上报，但部署脚本（update_config 的实例布局约定）仍在用。
 - 组网与平台接入不属于本 skill：见 `2-Overlay NetWork-Quick Start-Skill`（完整链路：skill 2 组网 → 本 skill 部署 → skill 4 平台）。
 
 ## 生死攸关的事实（八条）
 
-0. **只有正式模式（live）才开启端口切换能力——测试模式绝不启动算法的切换。** coarse 模式（本机默认）按「服务器 PSU 冗余」逻辑工作：总负载远小于单 PSU 额定（2000W）时会**关掉多余端口只留 1 个**。PDU 上接屏幕/充电器等非服务器测试负载时（2026-10-22 实际发生：两台测试负载被切断电），算法必须处于测试模式（`SWITCH_DISABLED` 闸门落下，见日常运维的 espur-switch.sh）。切换一律用 `espur-switch.sh`：`test` = 闸门落下（切换能力关闭，遥测/上报照常）；`live` = 闸门开启（切换能力开启），**仅当 PDU 接的是真实服务器 PSU、可接受端口被自动管理时才执行**。
+0. **测试闸门不是物理断电保护。** 当前仓库 `src/psu.py` 的 `SWITCH_DISABLED` 只阻止 `purpose=auto`，显式 `manual`/`safety` 不受该检查；实际安全补开调用是否传了正确 purpose 需按设备版本核对。手动指令仍可能产生真实 SET，不能声称测试模式禁止一切切换。现有 `espur-switch.sh` 连状态查询都会先启动服务、test 后落闸且只默认指向 1–4 口，**暂不要用于 status/test/live**；见 skill 5。不得把 live 或实际开关当作例行验收。
 
-1. **PDU 有管理 ACL：SNMP 只响应源地址在 192.168.0.x 网段的请求。** 源地址不对时症状是「ARP 正常、SNMP/TCP/ICMP 全部无响应」，极易误判为 PDU 挂死。所以 eth0 必须静态配 192.168.0.200/24（netplan 持久化，见 references/deployment.md）。**任何「PDU 不响应」的排查第一步：`ip route get 192.168.0.163`，确认走 eth0 且 src 是 192.168.0.200。**
+1. **PDU ACL 和路由按站点核对。** 某历史设备只响应 `192.168.0.x` 源地址；不能把历史 eth0/源地址直接套到其他机器。先确认站点、目标 PDU、实际路由及源地址，同地址的不同 PDU 不可混淆。
 2. **PDU 网口怕并发扫描**：254 并发的 SNMP 探测曾把它打挂过（重启 PDU 才恢复）。对它的一切探测必须串行、低速、带间隔。
-3. **绝不运行 `test_pdu.py`**：它会从 1 到 8 口依次通断电源，会切断插在 PDU 上的设备。验证 PDU 用只读的 `snmpget`/`snmpwalk` 或本 skill 的 `scripts/check_pdu.sh`。
+3. **绝不运行 `test_pdu.py`**：它会从 1 到 8 口依次通断电源，会切断插在 PDU 上的设备。现有 `scripts/check_pdu.sh` 使用整树 walk，不应自动运行；即使只读查询也可能拖慢 PDU。确认站点和设备后，只采用有界、串行、低频且经批准的精确读取。
 4. **v2 启动命令必须带 `--publish-db`（默认 False 不上报！）和 `--duration 0`（0=无限）**，且用 `python3 -u`（无缓冲，否则 stdout 块缓冲导致日志不可见）。
-5. **算法由 systemd 托管（`espur-algorithm.service`），不要手工 kill+nohup**（会出现双进程争抢 SNMP 与重复上报）。操作一律 `sudo systemctl restart/status espur-algorithm`；防冻结看门狗 `espur-alg-watchdog.timer`（日志 >900s 无输出自动重启，实锤冻结场景见 troubleshooting.md）。
-6. **从上游同步 `src/hal/snmp_pdu.py` 后必须重打一处实例级语义**：`total_power = sum(port_powers)`（上游 0d932c0 用设备级 `.2.2.4.0` 全 PDU 合计，单 PDU 多实例时会把其它实例负载计入本实例；文件内有注释标记）。其余 OID/缩放/set 字符串化修复与上游一致。
-7. **新机 bootstrap 后必须人工核对 instance_id（2026-11-03 Studio 实锤的上游 bug）**：bootstrap_config.py 的 CLOUD_KEYS 白名单漏了 `instance_id`，脚本声称写实例号但被静默跳过——实例号≠1 的新机会按模板默认值 1 上报，**数据全部打进实例 1（lab-01）**。每次 bootstrap 后核对 config.ini 的 instance_id 与平台 mine 接口返回一致，不一致手工改（Studio=2 已修；上游 wattos 待修）。同场必改：模板 `espur_deployment_abs_path` 是 macOS 路径（数据/日志/matrix 目录的根），须改成本机部署根；模板内嵌真实个人邮箱/QQ/SMTP 授权码（v1 遗留），勿外传。详见 espur-v2.md。
+5. 设备实例各有独立 systemd 单元；先只读核对其 `WorkingDirectory`、`ExecStart`、配置和状态，不要手工重复启动。是否重启须考虑实例、数据缓存和真实 PDU；看门狗及运行配置应按实机核实。
+6. **多实例总功率须按本实例口组核对**。当前工作区读取实现已包含端口求和；实际设备版本未经本次核实。同步前对比精确版本，勿机械重打旧补丁或覆盖现场配置。
+7. **bootstrap 后核对 instance_id、PDU 端口组及部署目录**。2026-11-03 旧版遗漏 instance_id 的问题是历史记录；当前工作区 `CLOUD_KEYS` 已包含该字段，不等于远端设备已更新。配置和旧模板可能包含凭据，勿打印或外传。
 
 ## 代码来源
 
@@ -50,7 +50,7 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 
 1. 同步 `eSpur_v2/` 到实例目录（`~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2`）。
 2. 平台 bootstrap token 写配置（`scripts/bootstrap_config.py --token`，见 skill 4 的 platform-onboard.md）。
-3. `python3 run.py --entry algorithm --mode real --pdu-ip 192.168.0.163 ... --duration 0` 先零时长冒烟，再长跑。
+3. `--duration 0` 是**无限运行**，不是零时长冒烟；`--mode real` 可能触发真实硬件操作。需要启动或验证时先明确目标实例、闸门和受供电负载，不在运行的服务旁手工启动第二进程。
 
 ### v1 链（遗留，仅布局约定仍被引用）
 
@@ -58,23 +58,16 @@ description: 在树莓派 (Pi4 / Raspberry Pi OS trixie) 上部署、运行和�
 
 ## 日常运维（v2，systemd 托管）
 
-```bash
-sudo systemctl status espur-algorithm          # 状态（MainPID / active）
-sudo systemctl restart espur-algorithm         # 重启上报（改代码/配置后）
-tail -f ~/eSpur/eSpur-deployment/192.168.0.163_1-2-3-4/eSpur_v2/algorithm_stdout.log  # 实时日志(-u 无缓冲)
-bash ~/.zcode/skills/espur-deploy/scripts/check_pdu.sh   # PDU 连通性体检（只读）
+先只读检查目标实例实际的 unit、工作目录、进程和日志。Studio A 与 B 的记录分别使用
+`espur-algorithm`、`espur-algorithm-b`，具体设备部署位置以实机核对为准。重启会中断上报，
+也可能影响物理供电，不能作为默认诊断步骤。旧 `check_pdu.sh` 会执行整树 SNMP walk，
+不要自动运行；需验证时先确定站点、目标与负载，再选择受限读取方法。
 
-**模式切换（test/live）与上联业务 IP**：统一由 skill 5（`5-eSpur Mode Switch-Quick Start-Skill`）管理——
-闸门语义与实测事故见上方规则 0，切换命令、业务 IP 配置（IP 由使用者提供）见 skill 5 的 SKILL.md；
-闸门代码在 `src/psu.py` 的 set_psu 开头，上游同步该文件后需重打（espur-v2.md 同步铁律 4）。
+**模式切换**见 skill 5：现有 `espur-switch.sh` 不能安全用于状态、test 或 live。
 
-- 服务内部命令等价于 `python3 -u run.py --entry algorithm --mode real ... --duration 0 --publish-db`；`bootstrap_config.py --refresh` 可配 systemd ExecStartPre（可选，离线安全）。
-- 日志 COARSE 行间隔可达数百秒（打印对齐），不代表卡住；判活看 CPU 增量与到 8.134.215.146:443 的连接。
-- 数据验收在平台（设备卡片四口小图 + 详情页）。排障顺序：`references/espur-v2.md`（本机 systemd 运维 + 上报语义 + 模式切换 + 同步铁律 + 最低版本表）→ `references/troubleshooting.md` 症状表。sudo 缓存过期（需要 root 时）让用户 `sudo -v`。
+## 历史现场记录（不是当前状态证明）
 
-## 本机既成事实
-
-- **2026-10-22（当前）**：算法改由 systemd 托管（`espur-algorithm.service` enabled + `espur-alg-watchdog.timer` 防冻结，冻结场景实锤过一次：平台偶发挂起时同步 POST 冻结主循环）。整机重启测试通过：网络/systemd 自启/上报全自动恢复，~1.5 分钟内可达。节能率上报在首次 PSU 切换前恒 0（`decision_count > 0` 判定）；Pi 关机期间数据不产生、实时曲线缺失不补。
+- **2026-10-22（历史）**：算法改由 systemd 托管（`espur-algorithm.service` enabled + `espur-alg-watchdog.timer` 防冻结，冻结场景实锤过一次：平台偶发挂起时同步 POST 冻结主循环）。整机重启测试通过：网络/systemd 自启/上报全自动恢复，~1.5 分钟内可达。节能率上报在首次 PSU 切换前恒 0（`decision_count > 0` 判定）；Pi 关机期间数据不产生、实时曲线缺失不补。
 - **2026-10-21**：v2 客户端运行中，平台 external_id=1 在线，单口曲线在线（口 3 实测 62W 屏幕负载）。SNMP OID 修复（`0d932c0`）与单口上报（`3b42ece`）均已在本机代码中。平台：lab-01 / lab-01@espur.local。
 - **2026-10-16（v1 部署期，历史）**：双实例布局（1-2-3-4 / 5-6-7-8）；MySQL 云端（120.76.119.71）部署当天即不可达，现已彻底废弃。手册在 `~/eSpur/eSpur部署完全手册.md`。
 

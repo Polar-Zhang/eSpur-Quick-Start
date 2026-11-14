@@ -1,8 +1,9 @@
 # eSpur 完整部署步骤（从零开始）【v1 遗留链】
 
 > 本文档描述 v1 部署链（eSpur 主程序 + MySQL 云端），现已不再上报。
-> 当前实际运行的是 eSpur_v2 客户端 + neowatt 平台，见 `v2-client.md`；
-> 实例目录布局约定（192.168.0.163_1-2-3-4 / update_config.py 分发）仍沿用本文。
+> 当前 eSpur_v2 相关核对见 [espur-v2.md](espur-v2.md) 和[全网拓扑](<../../2-Overlay NetWork-Quick Start-Skill/references/topology.md>)。
+> 以下命令仅保留历史取证用途，不是当前重建或排障步骤；不能照抄到主站、中转或实机。
+> 其中 netplan、删除/重建实例、启动旧程序、PDU 扫描及 hosts 修改都可能中断服务或改变供电。
 
 本机环境参照：Raspberry Pi 4B，Raspberry Pi OS Lite (Debian 13 trixie)，aarch64，Python 3.13，wlan0 在测试局域网（192.168.1.x），PDU 网线直连 eth0。
 
@@ -62,7 +63,7 @@ sudo chmod 600 /etc/netplan/<该文件>.yaml
 sudo netplan generate && sudo netplan apply
 ```
 
-> 2026-11-03 实测：netplan apply 会让 wlan0 闪断数秒后自动恢复（NM 重挂 profile），远程操作时别慌、别回滚；`/lib/netplan/00-network-manager-all.yaml` 的 "Permissions too open" 告警是镜像自带，无害。
+> 2026-11-03 曾出现 netplan apply 后 WLAN 闪断并恢复的历史现象；不保证其他机器或当前连接一定恢复。任何网络变更应先核实目标、既有配置和恢复通道。
 
 验证（**串行、低速**，不要并发扫描 PDU）：
 
@@ -126,16 +127,11 @@ python3 stat_eSpur.py
 
 正常输出每实例的 Node_id、功率、累计电量。日志在 `log/<实例>/<时间戳>log`。
 
-## 6. PDU 验证（只读，安全）
+## 6. PDU 验证（历史，原全树 walk 已撤下）
 
-```bash
-# 端口继电器状态（.23273.2.4.<N>.0，N=1..8）
-snmpwalk -v1 -c public 192.168.0.163 .1.3.6.1.4.1.23273 | grep '23273.2.4'
-# 全树（get_server_power 用它：result[1]=电压，result[10+N]=N口电流 0.01A）
-time snmpwalk -v1 -c public 192.168.0.163 .1.3.6.1.4.1.23273
-```
-
-健康时全树 walk < 0.1s。PDU 地址不变时无需改动；若换 PDU，改 config.ini 的 pdu_ip 和 json 的 key 后重跑第 4 步（先 `python3 delete_eSpur.py 0` 清旧实例目录）。
+历史教程把全树 `snmpwalk` 描述为“只读安全”；但 PDU 曾因探测负载受影响，命令每次请求的
+超时也不等于整次 walk 的墙钟上限。先确认站点、具体设备及负载；如需查询，按当前版本
+选择有界、串行、低频的精确 OID 只读方法。不能以网络不通为由自动重启 PDU 或服务。
 
 
 ## 机房部署变体（2026-10-22 确定，lab-01 机房形态）
@@ -173,12 +169,11 @@ time snmpwalk -v1 -c public 192.168.0.163 .1.3.6.1.4.1.23273
      排查：`nslookup neowatt.cn <网关>` / `<数据中心内网DNS>`；修复
      `nmcli con mod jifang ipv4.dns "<内网DNS> ..."`；
      兜底（所有 DNS 都不通时，hosts 写死平台 IP——上报只需解析这一个域名）：
-     `echo "8.134.215.146 neowatt.cn" | sudo tee -a /etc/hosts` →
-     `getent hosts neowatt.cn` 确认 → `sudo systemctl restart espur-algorithm`。
+     历史通过 hosts 指向中转；追加重复域名可能保留旧映射。实际解析和变更须逐设备核对，不能机械追加或自动重启。
      （2026-10-28 实测：机房禁公网 DNS，hosts 兜底后上报立即恢复）
-     兜底 `/etc/hosts` 写 `8.134.215.146 neowatt.cn`。
+     当时记录的中转地址仅供追溯，当前按拓扑及设备配置核实，不自动写入。
   2. **出站 UDP**：mesh（WireGuard）是 IP 直连不依赖 DNS，但需出站 UDP 51822；
      被拦则远程通道断（设备可能仍在正常上报）。应急：手机开同名热点让 wlan0 承载 mesh；
      长期：hub 已迁中转 51822（2026-11-14），此条为历史方案存档。
      判定顺序：先看平台是否仍在上报 → 在则设备活着、只是远程通道断。
-- 硬件看门狗已就位（挂死 1 分钟自愈），机房无人值守场景可依赖
+- 看门狗是当时的现场记录；当前设备是否启用、能否覆盖具体故障须另行核实。

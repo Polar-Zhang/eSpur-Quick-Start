@@ -1,6 +1,6 @@
 # eSpur Quick Start Skills
 
-eSpur 项目的全套部署/运维 skill：从一台全新的树莓派到云平台，按序号即按实施顺序。
+eSpur 项目的部署与运维资料。先确认主机和站点，再按任务选择对应 Skill；实机和网络变更不能仅按编号自动执行。
 
 ## Skill 地图
 
@@ -8,7 +8,7 @@ eSpur 项目的全套部署/运维 skill：从一台全新的树莓派到云平�
 |---|---|---|---|
 | 0 | `0-eSpur Full Stack-Quick Start-Skill` | **总控入口**：判定管理侧/设备侧，路由到下面各 skill | 双侧 |
 | 1 | `1-LCD-Quick Start-Skill` | Waveshare 2.4 寸 SPI LCD + fbcp 镜像（可选） | 设备 |
-| 2 | `2-Overlay NetWork-Quick Start-Skill` | WireGuard 组网：一键接入、看门狗自愈 | 设备 + 终端 |
+| 2 | `2-Overlay NetWork-Quick Start-Skill` | eSpur WireGuard 组网、拓扑与排障 | 设备 + 终端 |
 | 3 | `3-eSpur Deployment-Quick Start-Skill` | eSpur_v2 客户端部署（PDU SNMP + 平台上报） | 设备 |
 | 4 | `4-Management Platform-Quick Start-Skill` | 管理端全栈部署/更新/运维 + 设备接入管理 | 管理端 |
 | 5 | `5-eSpur Mode Switch-Quick Start-Skill` | 测试/生产模式切换 + 上联业务 IP 配置 | 设备 |
@@ -16,26 +16,18 @@ eSpur 项目的全套部署/运维 skill：从一台全新的树莓派到云平�
 
 新设备标准流程：**1（接了屏才做）→ 2 组网 → 3 部署 → 4 平台接入**；
 国际受限线路（校园网等）：在 2/3 之间插入 **6 中转接入**。
-不确定从哪开始：直接用 0 号总控，它会先判定你在管理侧还是设备侧。
+不确定从哪开始：先用 0 号总控核对平台、中转、设备或终端角色；不以云厂商或 DNS 单独判定。
 
 ## 拓扑
 
-```
-[树莓派 lab-01] —SNMP→ [ATEN PDU 192.168.0.163]
-      │ wg mesh (10.66.66.101)                ← 远程运维
-      │ HTTPS 上报（总功率 + 单口功率）
-      ▼
-[neowatt.cn 管理端]（阿里云新加坡 = WireGuard hub）
-      ▲
-[广州终端] —mesh 10.66.66.2— 远程操作实机与平台
-```
+现网记录见 [全网拓扑](<2-Overlay NetWork-Quick Start-Skill/references/topology.md>)：北京同时承载 eSpur hub `espur-wg0:51822/udp` 和用户独立的 `wg0:51820/udp`；新加坡平台是 eSpur peer `.254`。lab 侧 HTTPS 经北京 TCP 中转，Studio 侧按台账直连新加坡，数据上报不走 WG。各节点实时状态须单独核对。
 
 ## 相关仓库
 
 - `Polar-Zhang/eSpur` — 主程序（v2 客户端 + 管理端前后端）
-- 设备身份（工牌）、组网 Token 由管理端签发；**任何密钥/Token 不入库**
+- 平台设备 bootstrap 与旧组网注册是不同流程；旧新加坡 mesh enroll 和平台旧组网 Token 入口已退役，不能用于当前北京 hub。**任何密钥/Token 不入库**。
 
-## 实机现状（2026-11-03）
+## 历史实机记录（非实时状态）
 
 - **Studio**（Raspberry Pi 4B / trixie，user espur-studio）：全链路上线——LCD（背光物理12
   常亮方案）→ 组网 **10.66.66.102** → v2 部署（平台 external_id=**2**，studio@espur.local）
@@ -48,5 +40,4 @@ eSpur 项目的全套部署/运维 skill：从一台全新的树莓派到云平�
 ## 6-Domestic Relay-Quick Start-Skill
 
 国内中转节点（8.134.215.146，2026-11-14 起）：校园网/受限线路站点的平台通道桥接 + **eSpur WG hub（51822/udp）**。
-场景判定、机器侧两条命令接入、验证、坑点（安全组 UDP/TCP、CGNAT 漂移、MTU）、
-回滚、新增中转节点从零模板。2026-11-12 新增（lab-01 国际路径事件后定案）。
+使用前分别核对两套 WG、TCP 透传和具体节点现状；旧的一键接入、自动切端口和配置覆盖模板不适用于当前拓扑。

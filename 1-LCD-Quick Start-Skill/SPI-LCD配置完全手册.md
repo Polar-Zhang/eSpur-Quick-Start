@@ -7,6 +7,8 @@
 > - 参考链接：https://www.waveshare.net/wiki/2.4inch_LCD_Module （老教程基于 Bullseye，大量步骤已过时，本文全部更新）
 >
 > 配套文件：`~/LCD/waveshare-lcd-setup/` 是标准化 skill（含一键脚本 `scripts/setup.sh`，机器人和人都可以直接用它完成全流程）。本文是**手动**逐步配置的完整说明，含每一步的原因、细节和踩坑实录。
+>
+> **接线版本说明**：本手册下表保留 2026-10-16 的驱动默认 BL=GPIO24/物理18；Studio 后续实测使用 GPIO18/物理12，详见本目录 [README.md](README.md)。不同设备须按实际型号、接线和现场要求核对，不能仅凭历史表更改接线。
 
 ---
 

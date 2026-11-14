@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# The former Singapore hub, enrollment API and dual-port watchdog were retired.
+# This script can overwrite an unrelated wg0 (including the relay's own VPN).
+# Do not attempt package installation, configuration changes or service restarts.
+printf '%s\n' 'This legacy enrollment script is retired and performs no operations.' >&2
+printf '%s\n' 'See ../SKILL.md and references/topology.md for the current eSpur network.' >&2
+exit 2
+
 # eSpur overlay 组网一键接入（学校实机侧）
 # 两种用法：
 #   bash join_mesh.sh --enroll <token>              # 推荐：token 自动注册（密钥本机生成，私钥不出机）

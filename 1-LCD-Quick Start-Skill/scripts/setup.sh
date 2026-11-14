@@ -7,7 +7,9 @@
 #   系统:   Raspberry Pi OS Lite (Debian 13 trixie, arm64, 内核 6.18)
 #   屏幕:   Waveshare 2.4inch LCD Module, ILI9341, SPI 接线:
 #           DIN->GPIO10(MOSI,物理19) CLK->GPIO11(SCLK,物理23) CS->GPIO8(CE0,物理24)
-#           DC->GPIO25(物理22) RST->GPIO27(物理13) BL->GPIO24(物理18) VCC->3.3V GND->GND
+#           DC->GPIO25(物理22) RST->GPIO27(物理13) VCC->3.3V GND->GND
+#           BL: 驱动默认 GPIO24(物理18)；Studio 实测接 GPIO18(物理12) 保持背光常亮。
+#           按现场屏幕与接线核对，见本 skill 的 README.md，不要把历史接线当通用配置。
 #
 # 用法:  sudo bash setup.sh          (在本 skill 的 scripts/ 目录下)
 #        sudo FORCE=1 bash setup.sh  (机型/系统不完全匹配时强制)

@@ -1,58 +1,53 @@
 ---
 name: espur-full-stack
-description: eSpur 项目全流程总控入口。先判定当前是管理侧（云服务器/公网 IP/neowatt.cn 平台）还是实机设备侧（树莓派/实验室机器），再路由到对应的分 skill：1-LCD（可选）、2-组网、3-eSpur 部署、4-管理端。当用户提到 eSpur 全流程、新机器初始化、不知道该用哪个 skill、管理侧还是设备侧、整体部署、从头搭建、LCD 要不要配 等任何整体性话题时使用本 skill。用户在调用时说明侧别的，直接按说明路由。
+description: eSpur 项目全流程入口。先结合用户说明、主机身份及本机服务区分新加坡平台、北京中转、设备和终端，再路由到相应的 LCD、组网、客户端、管理端、模式或中转 skill；不得以云厂商或域名解析结果单独判定角色。
 ---
 
 # eSpur 全流程总控
 
-一句话：判定你在**管理侧**还是**实机设备侧**，然后把工作路由给对应编号的分 skill。
+先识别平台主站、中转节点、设备或终端，再按任务选择分 skill。全网现状及两套互不混用的 WireGuard 见[拓扑台账](<../2-Overlay NetWork-Quick Start-Skill/references/topology.md>)；远端状态应单独核对。
 
 ## 分 skill 地图（均在本仓库，独立可用）
 
 | 序号 | 目录 | 职责 | 适用于 |
 |---|---|---|---|
 | 1 | `1-LCD-Quick Start-Skill` | Waveshare 2.4 寸 SPI LCD + fbcp（**可选**） | 仅设备侧且实际接了屏 |
-| 2 | `2-Overlay NetWork-Quick Start-Skill` | WireGuard 组网接入 + 看门狗 | 设备侧 + 人的终端 |
+| 2 | `2-Overlay NetWork-Quick Start-Skill` | eSpur WireGuard 组网与排障 | 主站、设备侧 + 人的终端 |
 | 3 | `3-eSpur Deployment-Quick Start-Skill` | eSpur_v2 客户端部署与运维 | 设备侧 |
 | 4 | `4-Management Platform-Quick Start-Skill` | 管理端（neowatt.cn）部署/更新/运维 | 管理侧 |
-| 5 | `5-eSpur Mode Switch-Quick Start-Skill` | 测试/生产模式切换 + 上联业务 IP 配置（IP 由使用者提供） | 设备侧 |
+| 5 | `5-eSpur Mode Switch-Quick Start-Skill` | 测试/生产模式边界和上联业务 IP | 设备侧 |
+| 6 | `6-Domestic Relay-Quick Start-Skill` | 国内中转与双 WireGuard hub | 中转、受限线路设备 |
 
 完整链路（新设备从零到平台出数）：
 **1（有屏才做）→ 2 组网（远程优先）→ 3 部署 v2 客户端 → 4 平台接入（管理员生成 Token，实机一条命令）**
 
-## 第一步：判定侧别
+## 第一步：确认角色
 
-**用户已说明侧别时，直接采用，跳过探测。** 未说明时按顺序探测，任一命中即停：
+用户已说明角色时，以用户说明为起点；操作前再核对目标主机、站点和当前服务。区分：
 
-```bash
-MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null)
-echo "机型: ${MODEL:-未知}"
+- 新加坡平台主站：运行管理平台服务；是 eSpur mesh 的普通 peer。
+- 北京中转：运行透传及两套独立 hub；自有 `wg0` 与 eSpur `espur-wg0` 不可混用。
+- 设备侧：采样/控制 PDU 并上报；同一站点可能有多个实例。
+- 人的终端：仅按实际授权访问，不等同主站或设备。
 
-# 命中 1：树莓派 → 设备侧
-echo "$MODEL" | grep -qi "raspberry pi" && SIDE=device
-
-# 命中 2：阿里云元数据可达（本机是 ECS）→ 管理侧
-curl -s -m 2 http://100.100.100.200/latest/meta-data/instance-id | grep -q "^i-" && SIDE=mgmt
-
-# 命中 3：neowatt.cn 解析结果在本机网卡上 → 管理侧（平台所在机）
-ip -4 addr show 2>/dev/null | grep -q "$(getent hosts neowatt.cn | awk '{print $1}')" && SIDE=mgmt
-
-echo "SIDE=$SIDE"
-```
-
-两个特征都不命中且用户未说明时：**列出关键差异问用户**（这台机器有没有公网 IP？
-是不是树莓派？要部署的是平台还是客户端？），不要猜。
+只读核对可参考 `hostname`、`ip -br address`、`systemctl list-units --type=service`；
+域名解析可能被 hosts 改写，云服务器也可能是中转，因此均不能单独证明角色。主机身份或站点
+无法确认时不要猜，也不要写入配置或启动服务。不要用空 DNS 结果进行地址匹配。
 
 ## 第二步：按侧别路由
 
-### 管理侧（SIDE=mgmt）→ skill 4
+### 平台主站 → skill 4
 
 直接进入 `4-Management Platform-Quick Start-Skill`：
 - 从零复建/迁移 → 其 `references/server-setup.md`
 - 日常更新发布 → 其 SKILL.md「更新发布」
 - 平台功能操作（登记实机 / Token / 工牌 / 离线告警）→ 其 `references/platform-onboard.md`
 
-### 设备侧（SIDE=device）→ 按以下顺序走分 skill
+### 国内中转 → skill 6
+
+先核对当前中转与用户自有 WireGuard 的接口、端口和服务，严禁覆盖另一套网络。
+
+### 设备侧 → 按实际任务选择分 skill
 
 **① LCD（skill 1，可选，未接线直接跳过）**
 
@@ -70,8 +65,9 @@ systemctl is-active fbcp 2>/dev/null           # 已配置过？
 
 **② 组网（skill 2）**
 
-`scripts/join_mesh.sh --enroll <token>`（token 找管理员签发）。完成后设备获得
-mesh IP（lab 系列从 10.66.66.101 起），此后所有远程运维走 mesh，不再依赖局域网 IP。
+旧新加坡 hub 的 enroll 已退役，`join_mesh.sh` 及其旧看门狗不适用于现有北京 hub，
+不要执行旧 `--enroll` 或脚本的配置模式。按 skill 2 的现行拓扑核对接口和节点台账；
+北京自有 `wg0` 不属于 eSpur，禁止覆盖。
 
 **③ 部署 eSpur_v2（skill 3）**
 
@@ -84,10 +80,10 @@ PDU 网段静态 IP（eth0 192.168.0.200/24）+ 代码同步（codeload 通道�
 `python3 eSpur_v2/scripts/bootstrap_config.py --token dboot-xxx` →
 自动建号授权并开始上报。验收：平台设备卡片在线 + 四口小图出点。
 
-**⑤ 模式切换（进入正式运行前必做）**
+**⑤ 模式与真实控制（仅在用户明确提出且确认现场条件后）**
 
-PDU 接真实服务器 PSU 后，切生产模式：`espur-switch.sh live`（闸门开启，算法开始
-真实优化）；接测试负载调试时保持 test。见 skill 5。
+先按实例、站点和物理端口核对当前实际版本。现有 `espur-switch.sh` 对 status/test/live
+均有先启动服务的风险，暂不运行；测试闸门也不阻止所有手动/安全指令。见 skill 5。
 
 ## 快速排障路由
 
