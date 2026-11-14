@@ -69,7 +69,7 @@ bash ~/.zcode/skills/espur-deploy/scripts/check_pdu.sh   # PDU 连通性体检�
 闸门代码在 `src/psu.py` 的 set_psu 开头，上游同步该文件后需重打（espur-v2.md 同步铁律 4）。
 
 - 服务内部命令等价于 `python3 -u run.py --entry algorithm --mode real ... --duration 0 --publish-db`；`bootstrap_config.py --refresh` 可配 systemd ExecStartPre（可选，离线安全）。
-- 日志 COARSE 行间隔可达数百秒（打印对齐），不代表卡住；判活看 CPU 增量与到 47.237.111.211:443 的连接。
+- 日志 COARSE 行间隔可达数百秒（打印对齐），不代表卡住；判活看 CPU 增量与到 8.134.215.146:443 的连接。
 - 数据验收在平台（设备卡片四口小图 + 详情页）。排障顺序：`references/espur-v2.md`（本机 systemd 运维 + 上报语义 + 模式切换 + 同步铁律 + 最低版本表）→ `references/troubleshooting.md` 症状表。sudo 缓存过期（需要 root 时）让用户 `sudo -v`。
 
 ## 本机既成事实

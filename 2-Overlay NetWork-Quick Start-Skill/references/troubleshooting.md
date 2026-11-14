@@ -1,6 +1,6 @@
 # 组网排障手册
 
-## 0. enroll 模式专属问题
+## 0. enroll 模式专属问题（历史章节：enroll API 已于 2026-11-14 随旧 hub 退役，新节点走 SKILL.md 手工流程；下表保留供排查旧脚本残留时参考）
 
 | 症状 | 原因与处理 |
 |---|---|
@@ -16,7 +16,7 @@
 
 ```bash
 sudo wg show wg0                 # handshake / transfer / allowed ips
-ping -c 3 47.237.111.211         # 公网层可达性
+ping -c 3 8.134.215.146         # 公网层可达性
 ping -c 3 10.66.66.1             # 隧道层可达性（hub）
 ip route get 192.168.0.163       # 实验室网段路由
 journalctl -u wg-quick@wg0 -n 30 # 服务日志
@@ -57,7 +57,7 @@ EOF
 | ① STUN/NTP | ② hub 探测 | 结论 | 处理 |
 |---|---|---|---|
 | 通 | ICMP unreachable | UDP 全链路通，是配置/密钥问题 | 按第 2 条查 PublicKey 与 hub peer |
-| 通 | timeout | **hub 阿里云安全组没放行 UDP**（实测最常见根因） | 控制台加入方向 `51820/udp` + `443/udp`，源 0.0.0.0/0；放行后等看门狗重试（约 2 分钟周期），仍不通则重新 `--enroll` 新 token |
+| 通 | timeout | **hub 阿里云安全组没放行 UDP**（实测最常见根因） | 控制台加入方向 `51822/udp`，源 0.0.0.0/0（2026-11-14 起 hub 在中转，单端口） |
 | 不通 | — | 本地网络拦出站 UDP | 按第 1b 条走 443，仍不行按 1c 上 wstunnel |
 
 注：NTP（`ntp.aliyun.com:123`）可替代 STUN 做测试①，但只能证明"特定端口对特定目的地"放行；STUN 证明的是任意目的地，两者结合判读更稳。

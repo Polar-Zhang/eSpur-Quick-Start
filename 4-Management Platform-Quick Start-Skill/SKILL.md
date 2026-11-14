@@ -16,7 +16,7 @@ description: eSpur 管理端（neowatt.cn 云平台）的部署、更新与运�
                               └─ TLS: letsencrypt (neowatt.cn)
 [frontend] —/api→ [FastAPI backend] 127.0.0.1:8000 → PostgreSQL 5432 / Redis 6379
 [worker]  Celery（运行任务）          ← 同库同 Redis
-[WireGuard hub] 51820/udp + 443/udp（实机 mesh 隧道，与平台共存）
+[WG peer .254] → 中转 hub 8.134.215.146:51822（2026-11-14 起 mesh hub 迁至中转，本机不再是 hub）
 [espur-mesh-enroll] 8443：实机 token 换 mesh 配置（与后端 bootstrap 独立）
 ```
 
@@ -33,7 +33,7 @@ description: eSpur 管理端（neowatt.cn 云平台）的部署、更新与运�
 | espur-worker | Celery（实时归档等任务） |
 | espur-frontend | next start 127.0.0.1:3000 |
 | espur-mesh-enroll | uvicorn 127.0.0.1:8443（组网 token 注册） |
-| wg-quick@hub + @hub443 | 51820/udp + 443/udp，同一密钥同一 peer 表 |
+| wg-quick@wg0 | peer→中转 hub 8.134.215.146:51822（本机=.254，MTU 1380）；旧 hub/hub443 已于 2026-11-14 退役 |
 | nginx | 80/443 TCP，配置 /etc/nginx/conf.d/espur.conf |
 
 ## 更新发布（日常唯一流程）
@@ -87,8 +87,8 @@ curl -s -o /dev/null -w "%{http_code}\n" https://neowatt.cn/espur/instances
 
 ## 2026-11-12 增补
 
-- **平台拓扑新组件：国内中转节点** `8.148.245.206`（广州轻量，nginx stream 透明转发
-  TCP 443/8443→hub:443、UDP 51821→hub:51820）。国际受限站点（校园网等）经它接入，
+- **平台拓扑新组件：国内中转节点** `8.134.215.146`（2026-11-14 从 8.148.245.206 换机；nginx stream 透明转发
+  TCP 443/8443→新加坡主站:443、8444→新加坡:22；UDP 51821 死转发已删）。国际受限站点（校园网等）经它接入，
   平台零改动。维护/接入/坑点 → 新 skill `6-Domestic Relay-Quick Start-Skill`。
 - **DB 会话时区已钉 UTC**（`app/database.py` connect options；提交 `b9f7762`）：
   库内时间戳列统一 naive UTC，排查时用 `(now() AT TIME ZONE 'UTC')` 口径，勿用本地 now()。

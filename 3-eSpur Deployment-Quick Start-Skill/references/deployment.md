@@ -173,12 +173,12 @@ time snmpwalk -v1 -c public 192.168.0.163 .1.3.6.1.4.1.23273
      排查：`nslookup neowatt.cn <网关>` / `<数据中心内网DNS>`；修复
      `nmcli con mod jifang ipv4.dns "<内网DNS> ..."`；
      兜底（所有 DNS 都不通时，hosts 写死平台 IP——上报只需解析这一个域名）：
-     `echo "47.237.111.211 neowatt.cn" | sudo tee -a /etc/hosts` →
+     `echo "8.134.215.146 neowatt.cn" | sudo tee -a /etc/hosts` →
      `getent hosts neowatt.cn` 确认 → `sudo systemctl restart espur-algorithm`。
      （2026-10-28 实测：机房禁公网 DNS，hosts 兜底后上报立即恢复）
-     兜底 `/etc/hosts` 写 `47.237.111.211 neowatt.cn`。
-  2. **出站 UDP**：mesh（WireGuard）是 IP 直连不依赖 DNS，但需出站 UDP 51820/443；
+     兜底 `/etc/hosts` 写 `8.134.215.146 neowatt.cn`。
+  2. **出站 UDP**：mesh（WireGuard）是 IP 直连不依赖 DNS，但需出站 UDP 51822；
      被拦则远程通道断（设备可能仍在正常上报）。应急：手机开同名热点让 wlan0 承载 mesh；
-     长期：找数据中心放行 UDP 51820，或改走 wstunnel（TCP 443 伪装）。
+     长期：hub 已迁中转 51822（2026-11-14），此条为历史方案存档。
      判定顺序：先看平台是否仍在上报 → 在则设备活着、只是远程通道断。
 - 硬件看门狗已就位（挂死 1 分钟自愈），机房无人值守场景可依赖
