@@ -1,4 +1,10 @@
 #!/bin/bash
+# Legacy script starts the service before checking the mode or creating the
+# test gate. It is unsafe for status, test and live; fail before any action.
+printf '%s\n' 'This legacy mode switch is disabled; it performs no operations.' >&2
+printf '%s\n' 'See the mode Skill for current control boundaries and per-instance review.' >&2
+exit 2
+
 # eSpur 模式切换（闸门方案：算法服务常驻，遥测/决策/上报不断，仅切换能力开关）
 #   test = 放置 SWITCH_DISABLED 标记，PSU 切换被禁止（测试模式）
 #   live = 移除标记，算法恢复真实切换（正式模式）
