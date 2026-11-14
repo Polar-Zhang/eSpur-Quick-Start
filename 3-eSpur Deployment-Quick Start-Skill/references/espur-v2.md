@@ -225,3 +225,17 @@ bootstrap token（平台实例须先建、token 24h 有效）。其余（run.py/
 - 数据：`GET /api/dashboard`（KPI/机房分组/趋势/PUE/节能率/事件一次带齐，10s 轮询）。
 - PUE 口径：全 PDU 总功率 ÷ 服务器口功率合计（直连拓扑 ≈1.0；接入制冷/UPS 后升级为真实 PUE）。
 - 机房分组：SITE_ALIAS 映射（equipment 名 → 机房显示名）；正式化为 site 字段后替换。
+
+
+## 历史查询双路径 + 事故记录（2026-11-14 平台瘫痪事件）
+
+- **历史卡查询双路径**（telemetry 端点 table=history）：
+  ≤26h → legacy_power_time 原始表桶聚合（(instance,ts) 索引，秒级）；
+  >26h → legacy_power_hourly 小时表（毫秒级）。
+  **长区间禁止扫原始表**——2026-11-14 事故：详情页 10s 轮询 × 7d/30d 桶查询在 90 万行
+  原始表上全并行扫描（无可用索引增益，范围覆盖 64-100%），73 个 postgres worker 卡死
+  D 状态，负载 76，整机僵死（SSH/数据库全超时），用户被迫整机重启。
+- **防复发三件套**（均已上线）：① 三表 (instance,timestamp) 索引确认存在 ② 历史查询
+  statement_timeout 15s ③ 长区间强制走小时表。systemd 资源天花板（MemoryMax/CPUQuota）
+  为最后防线——未来任何漏网查询最多拖慢单个服务，整机不再僵死。
+- 教训：**任何新数据端点必须先在真实数据量下 EXPLAIN 验证**，再上线轮询路径。
