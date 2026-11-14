@@ -214,3 +214,14 @@ bootstrap token（平台实例须先建、token 24h 有效）。其余（run.py/
 - Studio：A/B 两个算法单元 active，遥测满速；其 PDU（MAC 尾 :80）**控制 OID 只写不可读
   （GET 恒超时）且曾出现"ACK 但继电器不动作"间歇故障**——已上线差量 SET + 读回熔断缓解，
   复发时用 PDU Web 页验证该口，必要时恢复出厂/换 PDU。
+
+
+## 信息大屏 /dashboard（2026-11-14 上线，测试版）
+
+- 路由：`/espur/dashboard`（主站风格亮色，未替换 /overview）；组件源码：
+  `references/components/`（`MachineRoomIso` 等距 3D 机房 SVG 纯手绘零依赖 + `GaugeRadial` 240° 仪表盘）。
+- 布局：KPI 六卡 → 三列（左=PUE/节能率仪表盘，中=3D 机房，右=当前状态行+设备动态）→
+  30 天趋势全宽 → 运维链接。
+- 数据：`GET /api/dashboard`（KPI/机房分组/趋势/PUE/节能率/事件一次带齐，10s 轮询）。
+- PUE 口径：全 PDU 总功率 ÷ 服务器口功率合计（直连拓扑 ≈1.0；接入制冷/UPS 后升级为真实 PUE）。
+- 机房分组：SITE_ALIAS 映射（equipment 名 → 机房显示名）；正式化为 site 字段后替换。
