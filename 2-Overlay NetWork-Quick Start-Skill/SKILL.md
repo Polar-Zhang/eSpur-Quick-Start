@@ -145,3 +145,7 @@ sysctl net.ipv4.ip_forward             # 必须 =1（hub 转发 peer 间流量�
 - **旧产物同步失效**：看门狗 443 切换（hub443 已退役）、lab-01 反连隧道 22022（hub 侧已无 relay 账号，未重建；现在 WG 直连稳定，暂不需要）。lab-01 的 `wg0-bounce-onboot` 若还在，对新配置无害可保留。
 - **管理 SSH**：`ssh -i ~/.ssh/espur_hub_ed25519 espur-5090@10.66.66.101`（lab-01 ✓ 实测）；Studio 管理公钥未装（装了即可直连）。
 - **迁移日两个坑**（已写进上文事实②③与排障表）：节点侧漏 AllowedIPs（握手正常数据全丢）；syncconf 热改不装内核路由。
+
+## 拓扑全景
+
+全网物理/WG 双 hub/上报链路/机器台账/端口矩阵常驻文档：`references/topology.md`（2026-11-15 快照；**改网先改它**）。
