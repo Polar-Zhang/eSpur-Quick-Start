@@ -237,3 +237,26 @@ lab-01 已设 2026-12-31 到期）、回复邮件通知、社区回复时区/归
   statement_timeout 15s ③ 长区间强制走小时表。systemd 资源天花板（MemoryMax/CPUQuota）
   是部分防护；数据库、内存与磁盘 I/O 仍共享，不能保证整机永不受影响。
 - 教训：**任何新数据端点必须先在真实数据量下 EXPLAIN 验证**，再上线轮询路径。
+
+## 日志级别与轮转（2026-11-17 事故固化）
+
+**事故**：`src/utils/utils.py` 根 logger 硬编码 DEBUG → urllib3 把每次 HTTPS 上报的
+连接细节（`connectionpool.py _new_conn/_make_request`）全写进 stdout 重定向文件，
+lab-01 `algorithm_stdout.log` 膨胀到 **381MB / 287 万行（尾部 99.8% 是 DEBUG）**，
+~50MB/天。修复后 1KB/45s、DEBUG 绝迹；COARSE 是 print 不受影响，闸门/手动指令
+告警是 WARNING 级照常保留（取证能力不损失）。
+
+- **现行代码**（提交 `2f2468d`）：`logger.setLevel(os.environ.get("ESPUR_LOG_LEVEL", "INFO").upper())`
+  ——默认 INFO，排障时可临时 `Environment=ESPUR_LOG_LEVEL=DEBUG` 后重启。
+- **部署同步**：lab-01 已热修（`utils.py.bak-20261117` 备份在位）；**Studio / Studio-Backup
+  下次部署拉新代码自动带上**，存量日志若大顺手 `: > algorithm_stdout.log`。
+- **logrotate 保险**（root 一次安装）：
+  ```
+  sudo install -m 644 /tmp/espur-logrotate /etc/logrotate.d/espur-algorithm
+  ```
+  （模板在实机 /tmp/espur-logrotate：daily + size 20M + compress + rotate 7 +
+  copytruncate + `su <user> <user>`——没有 `su` 会因日志目录属主报错。）
+- **两个 sudo 坑（lab-01 实锤）**：① 全局时间戳 15 分钟——`sudo -n` 通过≠授权在，
+  过期即密码门（skill 3 老坑再现）；② NOPASSWD 规则**必须完整路径**调用才匹配：
+  `sudo -n /usr/bin/systemctl restart espur-algorithm` ✓，`sudo -n systemctl restart …` ✗，
+  且带 `--no-pager` 之类附加参数同样不匹配（status 那条就是这样失效的）。
